@@ -23,4 +23,7 @@ XFAIL_TESTS += empty_01.clit
 XFAIL_TESTS += empty_02.clit
 XFAIL_TESTS += empty_03.clit
 
+TESTS += diff_01.clit
+XFAIL_TESTS += diff_02.clit
+
 ## Makefile.am ends here

@@ -1,0 +1,17 @@
+#!/usr/bin/clitoris  ## -*- shell-script -*-
+
+$ cat <<EOF
+foo
+bar
+baz
+bar
+baz
+EOF
+foo
+bar
+baz
+bar
+baz
+$
+
+## diff_01.clit ends here

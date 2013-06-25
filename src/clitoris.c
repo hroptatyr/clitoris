@@ -328,10 +328,72 @@ fini_chld(struct clit_chld_s ctx[static 1])
 }
 
 static int
+diff_bits(clit_bit_t exp, clit_bit_t is)
+{
+	int pin_a[2];
+	int pin_b[2];
+	pid_t difftool;
+
+	if (0) {
+		;
+	} else if (UNLIKELY(pipe(pin_a) < 0)) {
+		return -1;
+	} else if (UNLIKELY(pipe(pin_b) < 0)) {
+		return -1;
+	}
+
+	switch ((difftool = vfork())) {
+	case -1:
+		/* i am an error */
+		break;
+
+	case 0:;
+		static char fa[64];
+		static char fb[64];
+
+		/* i am the child */
+		close(STDIN_FILENO);
+		close(STDOUT_FILENO);
+		/* kick the write ends of our pipes */
+		close(pin_a[1]);
+		close(pin_b[1]);
+
+		/* stdout -> stderr */
+		dup2(STDERR_FILENO, STDOUT_FILENO);
+
+		snprintf(fa, sizeof(fa), "/dev/fd/%d", *pin_a);
+		snprintf(fb, sizeof(fb), "/dev/fd/%d", *pin_b);
+
+		execlp("diff", "diff", fa, fb, NULL);
+
+	default:;
+		int st;
+
+		/* i am the parent, clean up descriptors */
+		close(*pin_a);
+		close(*pin_b);
+
+		/* just to be on the safe side, send a false */
+		write(pin_a[1], exp.d, exp.z);
+		write(pin_b[1], is.d, is.z);
+		close(pin_a[1]);
+		close(pin_b[1]);
+
+		while (waitpid(difftool, &st, 0) != difftool);
+		if (WIFEXITED(st)) {
+			return WEXITSTATUS(st);
+		}
+		break;
+	}
+	return -1;
+}
+
+static int
 diff_out(struct clit_chld_s ctx[static 1], clit_bit_t exp)
 {
 	static char *buf;
 	static size_t bsz;
+	ssize_t nrd;
 	int rc = 0;
 
 	/* check and maybe realloc read buffer */
@@ -340,10 +402,14 @@ diff_out(struct clit_chld_s ctx[static 1], clit_bit_t exp)
 		buf = realloc(buf, bsz);
 	}
 
-	if (read(ctx->pou, buf, bsz) != exp.z || memcmp(buf, exp.d, exp.z)) {
-		/* also check for equality */
-		puts("output differs");
+	if ((nrd = read(ctx->pou, buf, bsz)) < 0) {
 		rc = 1;
+	} else if (nrd != exp.z || memcmp(buf, exp.d, exp.z)) {
+		clit_bit_t is = {.z = (size_t)nrd, .d = buf};
+
+		/* best to leave a note in any case */
+		fputs("output differs\n", stderr);
+		rc = diff_bits(exp, is);
 	}
 	return rc;
 }
