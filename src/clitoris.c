@@ -95,6 +95,8 @@ struct clit_tst_s {
 	clit_bit_t rest;
 };
 
+static int verbosep;
+
 
 static void
 __attribute__((format(printf, 2, 3)))
@@ -466,7 +468,13 @@ test_f(clitf_t tf)
 		return -1;
 	}
 	for (; find_tst(tst, bp, bz) == 0; bp = tst->rest.d, bz = tst->rest.z) {
+		if (verbosep) {
+			fwrite(tst->cmd.d, sizeof(char), tst->cmd.z, stderr);
+		}
 		if ((rc = run_tst(ctx, tst))) {
+			if (verbosep) {
+				fprintf(stderr, "$? %d\n", rc);
+			}
 			break;
 		}
 	}
@@ -536,6 +544,9 @@ main(int argc, char *argv[])
 	}
 	if (argi->husk_given) {
 		setenv("husk", argi->husk_arg, 1);
+	}
+	if (argi->verbose_given) {
+		verbosep = 1;
 	}
 
 	/* also bang builddir to path */
