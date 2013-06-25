@@ -318,7 +318,7 @@ fini_chld(struct clit_chld_s ctx[static 1])
 	close(ctx->pin);
 	close(ctx->pou);
 
-	while (waitpid(ctx->chld, &st, 0) != -1);
+	while (waitpid(ctx->chld, &st, 0) != ctx->chld);
 	if (WIFEXITED(st)) {
 		return WEXITSTATUS(st);
 	} else if (WIFSIGNALED(st)) {
