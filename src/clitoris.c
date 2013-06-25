@@ -458,7 +458,7 @@ test_f(clitf_t tf)
 	static struct clit_tst_s tst[1];
 	const char *bp = tf.d;
 	size_t bz = tf.z;
-	int rc = -1;
+	int rc = 0;
 
 	if (UNLIKELY(init_chld(ctx) < 0)) {
 		return -1;
