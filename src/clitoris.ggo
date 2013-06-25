@@ -22,3 +22,7 @@ option "husk" -
 option "shell-bits" -
 	"Use SCRIPT as shell part of the test"
 	optional string typestr="SCRIPT"
+
+option "verbose" v
+	"Repeat execution steps on stderr"
+	optional
