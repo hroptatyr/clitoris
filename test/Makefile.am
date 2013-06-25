@@ -6,20 +6,16 @@ include $(top_builddir)/version.mk
 LANG = C
 LC_ALL = C
 
-AM_CFLAGS = $(EXTRA_CFLAGS)
-AM_CPPFLAGS = -D_POSIX_C_SOURCE=200112L -D_XOPEN_SOURCE=600 -D_BSD_SOURCE
-AM_CPPFLAGS += -DTEST
-
 EXTRA_DIST = $(BUILT_SOURCES) $(TESTS) $(XFAIL_TESTS)
 TESTS =
 XFAIL_TESTS =
 TEST_EXTENSIONS =
-BUILT_SOURCES =
-CLEANFILES = $(check_PROGRAMS)
 
 TEST_EXTENSIONS += .clit
 CLIT_LOG_COMPILER = $(top_builddir)/src/clitoris
 AM_CLIT_LOG_FLAGS = --builddir $(top_builddir)/src
+
+TESTS += $(XFAIL_TESTS)
 
 ## the actual tests here
 TESTS += ret_01.clit
