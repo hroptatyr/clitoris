@@ -393,9 +393,6 @@ init_tst(struct clit_chld_s ctx[static 1])
 			};
 			epoll_ctl(ctx->pll, EPOLL_CTL_ADD, ctx->pou, &ev);
 		}
-
-		/* just to be on the safe side, send a false */
-		write(ctx->pin, "false\n", sizeof("false\n") - 1U);
 		break;
 	}
 	return 0;
@@ -437,9 +434,10 @@ run_tst(struct clit_chld_s ctx[static 1], struct clit_tst_s tst[static 1])
 		if (epoll_wait(ctx->pll, ev, countof(ev), 2000/*ms*/) <= 0) {
 			/* indicate timeout */
 			puts("timeout");
-			return -1;
+			rc = -1;
+		} else {
+			rc = diff_out(ctx, tst->out);
 		}
-		rc = diff_out(ctx, tst->out);
 	} else {
 		/* we expect no output, check if there is some anyway */
 		if (epoll_wait(ctx->pll, ev, countof(ev), 10/*ms*/) > 0) {
@@ -447,7 +445,11 @@ run_tst(struct clit_chld_s ctx[static 1], struct clit_tst_s tst[static 1])
 			rc = -1;
 		}
 	}
-	fini_tst(ctx);
+	with (int fin_rc = fini_tst(ctx)) {
+		if (rc >= 0 && fin_rc) {
+			rc = fin_rc;
+		}
+	}
 	return rc;
 }
 
