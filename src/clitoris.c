@@ -1,4 +1,4 @@
-/*** clitoris.c -- command line testing oris
+/*** clitoris.c -- command-line-interface tester or is it?
  *
  * Copyright (C) 2013 Sebastian Freundt
  *
