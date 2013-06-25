@@ -19,9 +19,9 @@ TESTS += $(XFAIL_TESTS)
 
 ## the actual tests here
 TESTS += ret_01.clit
-XFAIL_TESTS += empty_01.clit
-XFAIL_TESTS += empty_02.clit
-XFAIL_TESTS += empty_03.clit
+TESTS += empty_01.clit
+TESTS += empty_02.clit
+TESTS += empty_03.clit
 
 TESTS += diff_01.clit
 XFAIL_TESTS += diff_02.clit
