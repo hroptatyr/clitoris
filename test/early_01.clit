@@ -1,0 +1,10 @@
+#!/usr/bin/clitoris  ## -*- shell-script -*-
+
+## should succeed
+$ echo
+
+$ false
+$ true
+$
+
+## early_01.clit ends here
