@@ -393,9 +393,6 @@ init_tst(struct clit_chld_s ctx[static 1])
 			};
 			epoll_ctl(ctx->pll, EPOLL_CTL_ADD, ctx->pou, &ev);
 		}
-
-		/* just to be on the safe side, send a false */
-		write(ctx->pin, "false\n", sizeof("false\n") - 1U);
 		break;
 	}
 	return 0;
