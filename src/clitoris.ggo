@@ -24,5 +24,9 @@ option "shell-bits" -
 	optional string typestr="SCRIPT"
 
 option "verbose" v
-	"Repeat execution steps on stderr"
+	"Repeat execution steps on stderr."
+	optional
+
+option "pseudo-tty" t
+	"Allocate a pseudo-tty for the tests to run in."
 	optional

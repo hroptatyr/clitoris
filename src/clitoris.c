@@ -96,6 +96,7 @@ struct clit_tst_s {
 };
 
 static int verbosep;
+static int ptyp;
 
 static sigset_t fatal_signal_set[1];
 static sigset_t empty_signal_set[1];
@@ -146,11 +147,30 @@ block_sigs(void)
 static void
 unblock_sigs(void)
 {
-	sigset_t empty;
-
-	sigemptyset(&empty);
-	sigprocmask(SIG_SETMASK, &empty, (sigset_t*)NULL);
+	sigprocmask(SIG_SETMASK, empty_signal_set, (sigset_t*)NULL);
 	return;
+}
+
+static void
+redir_sigs(void)
+{
+/* block sighup */
+	sigset_t ptyhup[1];
+
+	sigemptyset(ptyhup);
+	sigaddset(ptyhup, SIGHUP);
+	sigprocmask(SIG_SETMASK, ptyhup, (sigset_t*)NULL);
+	return;
+}
+
+static pid_t
+pfork(int *pty)
+{
+	if (UNLIKELY(pty == NULL)) {
+		errno = ENOMEM;
+		return -1;
+	}
+	return forkpty(pty, NULL, NULL, NULL);
 }
 
 
@@ -380,7 +400,7 @@ static int
 init_tst(struct clit_chld_s ctx[static 1])
 {
 /* set up a connection with /bin/sh to pipe to and read from */
-	int pty = 0;
+	int pty;
 	int pin[2];
 	int pou[2];
 
@@ -395,7 +415,7 @@ init_tst(struct clit_chld_s ctx[static 1])
 	}
 
 	block_sigs();
-	switch ((ctx->chld = vfork())) {
+	switch ((ctx->chld = LIKELY(!ptyp) ? vfork() : pfork(&pty))) {
 	case -1:
 		/* i am an error */
 		unblock_sigs();
@@ -404,9 +424,14 @@ init_tst(struct clit_chld_s ctx[static 1])
 	case 0:
 		/* i am the child */
 		unblock_sigs();
+		if (ptyp) {
+			/* in pty mode make sure we block SIGHUP so we
+			 * actually get the exit status of the shell */
+			redir_sigs();
+		}
 
 		/* read from pin and write to pou */
-		if (!pty) {
+		if (LIKELY(!ptyp)) {
 			close(STDIN_FILENO);
 			close(STDOUT_FILENO);
 			/* pin[0] ->stdin */
@@ -426,13 +451,13 @@ init_tst(struct clit_chld_s ctx[static 1])
 	default:
 		/* i am the parent, clean up descriptors */
 		close(pin[0]);
-		if (pty) {
+		if (UNLIKELY(ptyp)) {
 			close(pin[1]);
 		}
 		close(pou[1]);
 
 		/* assign desc, write end of pin */
-		if (!pty) {
+		if (LIKELY(!ptyp)) {
 			ctx->pin = pin[1];
 		} else {
 			ctx->pin = pty;
@@ -468,10 +493,6 @@ fini_tst(struct clit_chld_s ctx[static 1])
 	while (waitpid(ctx->chld, &st, 0) != ctx->chld);
 	if (WIFEXITED(st)) {
 		return WEXITSTATUS(st);
-	} else if (WIFSIGNALED(st)) {
-		if (WTERMSIG(st) == SIGTERM) {
-			return 0;
-		}
 	}
 	return -1;
 }
@@ -600,6 +621,9 @@ main(int argc, char *argv[])
 	}
 	if (argi->verbose_given) {
 		verbosep = 1;
+	}
+	if (argi->pseudo_tty_given) {
+		ptyp = 1;
 	}
 
 	/* also bang builddir to path */
