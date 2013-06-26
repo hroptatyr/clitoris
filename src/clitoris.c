@@ -505,7 +505,7 @@ init_tst(struct clit_chld_s ctx[static 1])
 
 		if (LIKELY(ctx->pll >= 0)) {
 			static struct epoll_event ev = {
-				EPOLLIN | EPOLLRDHUP | EPOLLHUP | EPOLLONESHOT,
+				EPOLLIN | EPOLLONESHOT,
 			};
 			epoll_ctl(ctx->pll, EPOLL_CTL_ADD, ctx->pou, &ev);
 		}
@@ -515,54 +515,47 @@ init_tst(struct clit_chld_s ctx[static 1])
 }
 
 static int
-fini_tst(struct clit_chld_s ctx[static 1])
-{
-	int st;
-
-	if (UNLIKELY(ctx->chld == -1)) {
-		return -1;
-	}
-
-	/* and indicate end of pipes */
-	close(ctx->pin);
-	close(ctx->pou);
-
-	unblock_sigs();
-	while (waitpid(ctx->chld, &st, 0) != ctx->chld);
-	if (WIFEXITED(st)) {
-		return WEXITSTATUS(st);
-	}
-	return -1;
-}
-
-static int
 run_tst(struct clit_chld_s ctx[static 1], struct clit_tst_s tst[static 1])
 {
 	static struct epoll_event ev[1];
-	int rc = 0;
+	int st;
+	int rc;
+	int nev;
 
-	init_tst(ctx);
+	if (UNLIKELY(init_tst(ctx) < 0)) {
+		return -1;
+	}
 	write(ctx->pin, tst->cmd.d, tst->cmd.z);
-	if (tst->out.z > 0U) {
-		if (epoll_wait(ctx->pll, ev, countof(ev), 2000/*ms*/) <= 0) {
-			/* indicate timeout */
-			puts("timeout");
-			rc = -1;
-		} else {
-			rc = diff_out(ctx, tst->out);
-		}
+
+	unblock_sigs();
+
+	/* indicate we're not writing anymore stuff on the child's stdin */
+	close(ctx->pin);
+
+	while (waitpid(ctx->chld, &st, 0) != ctx->chld);
+	if (LIKELY(WIFEXITED(st))) {
+		rc = WEXITSTATUS(st);
 	} else {
-		/* we expect no output, check if there is some anyway */
-		if (epoll_wait(ctx->pll, ev, countof(ev), 10/*ms*/) > 0) {
-			puts("output present but not expected");
-			rc = -1;
-		}
+		rc = 1;
 	}
-	with (int fin_rc = fini_tst(ctx)) {
-		if (rc >= 0 && fin_rc) {
-			rc = fin_rc;
-		}
+
+	/* snarf child's stdout */
+	errno = 0;
+	if (UNLIKELY((nev = epoll_wait(ctx->pll, ev, countof(ev), 0)) < 0)) {
+		/* uh oh */
+		;
+	} else if (tst->out.z > 0U && (nev == 0 || !(ev[0].events & EPOLLIN))) {
+		error(0, "output expected, none there");
+		rc = -1;
+	} else if (tst->out.z > 0U && (ev[0].events & EPOLLIN)) {
+		rc = diff_out(ctx, tst->out);
+	} else if (tst->out.z == 0U && nev > 0 && (ev[0].events & EPOLLIN)) {
+		error(0, "output present but not expected");
+		rc = -1;
 	}
+
+	/* now indicate we won't be reading stuff from now on */
+	close(ctx->pou);
 	return rc;
 }
 
