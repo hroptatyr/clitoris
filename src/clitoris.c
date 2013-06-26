@@ -98,6 +98,7 @@ struct clit_tst_s {
 static int verbosep;
 
 static sigset_t fatal_signal_set[1];
+static sigset_t empty_signal_set[1];
 
 
 static void
@@ -259,12 +260,15 @@ init_chld(struct clit_chld_s ctx[static 1])
 	ctx->pll = epoll_create1(EPOLL_CLOEXEC);
 
 	/* set up the set of fatal signals */
+	sigemptyset(fatal_signal_set);
 	sigaddset(fatal_signal_set, SIGHUP);
 	sigaddset(fatal_signal_set, SIGQUIT);
 	sigaddset(fatal_signal_set, SIGINT);
 	sigaddset(fatal_signal_set, SIGTERM);
 	sigaddset(fatal_signal_set, SIGXCPU);
 	sigaddset(fatal_signal_set, SIGXFSZ);
+	/* also the empty set */
+	sigemptyset(empty_signal_set);
 	return 0;
 }
 
