@@ -286,6 +286,8 @@ diff_bits(clit_bit_t exp, clit_bit_t is)
 		snprintf(fb, sizeof(fb), "/dev/fd/%d", *pin_b);
 
 		execlp("diff", "diff", fa, fb, NULL);
+		error(0, "execlp failed");
+		_exit(EXIT_FAILURE);
 
 	default:;
 		int st;
@@ -372,6 +374,8 @@ init_tst(struct clit_chld_s ctx[static 1])
 		dup2(pou[1], STDOUT_FILENO);
 		close(pou[0]);
 		execl("/bin/sh", "sh", NULL);
+		error(0, "execl failed");
+		_exit(EXIT_FAILURE);
 
 	default:
 		/* i am the parent, clean up descriptors */
@@ -455,6 +459,7 @@ run_tst(struct clit_chld_s ctx[static 1], struct clit_tst_s tst[static 1])
 	return rc;
 }
 
+
 static int
 test_f(clitf_t tf)
 {
