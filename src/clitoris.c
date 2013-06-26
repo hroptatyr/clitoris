@@ -329,7 +329,7 @@ diff_bits(clit_bit_t exp, clit_bit_t is)
 		close(*pin_a);
 		close(*pin_b);
 
-		/* just to be on the safe side, send a false */
+		/* feed the stuff we want diff'd to the descriptors */
 		write(pin_a[1], exp.d, exp.z);
 		write(pin_b[1], is.d, is.z);
 		close(pin_a[1]);
