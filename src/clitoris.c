@@ -474,14 +474,14 @@ init_tst(struct clit_chld_s ctx[static 1])
 			close(STDOUT_FILENO);
 			/* pin[0] ->stdin */
 			dup2(pin[0], STDIN_FILENO);
-			close(pin[1]);
-		} else {
-			close(pin[0]);
-			close(pin[1]);
 		}
+		close(pin[0]);
+		close(pin[1]);
+
 		/* stdout -> pou[1] */
 		dup2(pou[1], STDOUT_FILENO);
 		close(pou[0]);
+		close(pou[1]);
 		execl("/bin/sh", "sh", NULL);
 		error(0, "execl failed");
 		_exit(EXIT_FAILURE);
