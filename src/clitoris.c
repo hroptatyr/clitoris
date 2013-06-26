@@ -97,6 +97,8 @@ struct clit_tst_s {
 
 static int verbosep;
 
+static sigset_t fatal_signal_set[1];
+
 
 static void
 __attribute__((format(printf, 2, 3)))
@@ -131,6 +133,23 @@ static int
 munmap_fd(clitf_t map)
 {
 	return munmap(map.d, map.z);
+}
+
+static void
+block_sigs(void)
+{
+	(void)sigprocmask(SIG_BLOCK, fatal_signal_set, (sigset_t*)NULL);
+	return;
+}
+
+static void
+unblock_sigs(void)
+{
+	sigset_t empty;
+
+	sigemptyset(&empty);
+	sigprocmask(SIG_SETMASK, &empty, (sigset_t*)NULL);
+	return;
 }
 
 
@@ -238,6 +257,14 @@ static int
 init_chld(struct clit_chld_s ctx[static 1])
 {
 	ctx->pll = epoll_create1(EPOLL_CLOEXEC);
+
+	/* set up the set of fatal signals */
+	sigaddset(fatal_signal_set, SIGHUP);
+	sigaddset(fatal_signal_set, SIGQUIT);
+	sigaddset(fatal_signal_set, SIGINT);
+	sigaddset(fatal_signal_set, SIGTERM);
+	sigaddset(fatal_signal_set, SIGXCPU);
+	sigaddset(fatal_signal_set, SIGXFSZ);
 	return 0;
 }
 
@@ -263,16 +290,21 @@ diff_bits(clit_bit_t exp, clit_bit_t is)
 		return -1;
 	}
 
+	block_sigs();
+
 	switch ((difftool = vfork())) {
 	case -1:
 		/* i am an error */
+		unblock_sigs();
 		break;
 
 	case 0:;
+		/* i am the child */
 		static char fa[64];
 		static char fb[64];
 
-		/* i am the child */
+		unblock_sigs();
+
 		close(STDIN_FILENO);
 		close(STDOUT_FILENO);
 		/* kick the write ends of our pipes */
@@ -286,11 +318,14 @@ diff_bits(clit_bit_t exp, clit_bit_t is)
 		snprintf(fb, sizeof(fb), "/dev/fd/%d", *pin_b);
 
 		execlp("diff", "diff", fa, fb, NULL);
+		error(0, "execlp failed");
+		_exit(EXIT_FAILURE);
 
 	default:;
+		/* i am the parent */
 		int st;
 
-		/* i am the parent, clean up descriptors */
+		/* clean up descriptors */
 		close(*pin_a);
 		close(*pin_b);
 
@@ -299,6 +334,8 @@ diff_bits(clit_bit_t exp, clit_bit_t is)
 		write(pin_b[1], is.d, is.z);
 		close(pin_a[1]);
 		close(pin_b[1]);
+
+		unblock_sigs();
 
 		while (waitpid(difftool, &st, 0) != difftool);
 		if (WIFEXITED(st)) {
@@ -339,7 +376,7 @@ static int
 init_tst(struct clit_chld_s ctx[static 1])
 {
 /* set up a connection with /bin/sh to pipe to and read from */
-	int pty;
+	int pty = 0;
 	int pin[2];
 	int pou[2];
 
@@ -353,35 +390,45 @@ init_tst(struct clit_chld_s ctx[static 1])
 		return -1;
 	}
 
-	/* allow both vfork() and forkpty() if requested */
-	switch ((ctx->chld = 1 ? vfork() : forkpty(&pty, NULL, NULL, NULL))) {
+	block_sigs();
+	switch ((ctx->chld = vfork())) {
 	case -1:
 		/* i am an error */
+		unblock_sigs();
 		return -1;
 
 	case 0:
-		/* i am the child, read from pin and write to pou */
-		if (1) {
+		/* i am the child */
+		unblock_sigs();
+
+		/* read from pin and write to pou */
+		if (!pty) {
 			close(STDIN_FILENO);
 			close(STDOUT_FILENO);
 			/* pin[0] ->stdin */
 			dup2(pin[0], STDIN_FILENO);
+			close(pin[1]);
+		} else {
+			close(pin[0]);
 			close(pin[1]);
 		}
 		/* stdout -> pou[1] */
 		dup2(pou[1], STDOUT_FILENO);
 		close(pou[0]);
 		execl("/bin/sh", "sh", NULL);
+		error(0, "execl failed");
+		_exit(EXIT_FAILURE);
 
 	default:
 		/* i am the parent, clean up descriptors */
-		if (1) {
-			close(pin[0]);
+		close(pin[0]);
+		if (pty) {
+			close(pin[1]);
 		}
 		close(pou[1]);
 
 		/* assign desc, write end of pin */
-		if (1) {
+		if (!pty) {
 			ctx->pin = pin[1];
 		} else {
 			ctx->pin = pty;
@@ -413,6 +460,7 @@ fini_tst(struct clit_chld_s ctx[static 1])
 	close(ctx->pin);
 	close(ctx->pou);
 
+	unblock_sigs();
 	while (waitpid(ctx->chld, &st, 0) != ctx->chld);
 	if (WIFEXITED(st)) {
 		return WEXITSTATUS(st);
@@ -455,6 +503,7 @@ run_tst(struct clit_chld_s ctx[static 1], struct clit_tst_s tst[static 1])
 	return rc;
 }
 
+
 static int
 test_f(clitf_t tf)
 {
