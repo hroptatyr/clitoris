@@ -96,6 +96,9 @@ struct clit_tst_s {
 };
 
 static int verbosep;
+static int pty;
+
+static sigset_t fatal_signal_set[1];
 
 
 static void
@@ -131,6 +134,37 @@ static int
 munmap_fd(clitf_t map)
 {
 	return munmap(map.d, map.z);
+}
+
+static void
+block_sigs(void)
+{
+	(void)sigprocmask(SIG_BLOCK, fatal_signal_set, (sigset_t*)NULL);
+	return;
+}
+
+static void
+unblock_sigs(void)
+{
+	sigset_t empty;
+
+	sigemptyset(&empty);
+	sigprocmask(SIG_SETMASK, &empty, (sigset_t*)NULL);
+	return;
+}
+
+static pid_t
+myfork(void)
+{
+	pid_t res;
+
+	block_sigs();
+
+	/* allow both vfork() and forkpty() if requested */
+	res = vfork();
+
+	unblock_sigs();
+	return res;
 }
 
 
@@ -238,6 +272,14 @@ static int
 init_chld(struct clit_chld_s ctx[static 1])
 {
 	ctx->pll = epoll_create1(EPOLL_CLOEXEC);
+
+	/* set up the set of fatal signals */
+	sigaddset(fatal_signal_set, SIGHUP);
+	sigaddset(fatal_signal_set, SIGQUIT);
+	sigaddset(fatal_signal_set, SIGINT);
+	sigaddset(fatal_signal_set, SIGTERM);
+	sigaddset(fatal_signal_set, SIGXCPU);
+	sigaddset(fatal_signal_set, SIGXFSZ);
 	return 0;
 }
 
@@ -263,16 +305,16 @@ diff_bits(clit_bit_t exp, clit_bit_t is)
 		return -1;
 	}
 
-	switch ((difftool = vfork())) {
+	switch ((difftool = myfork())) {
 	case -1:
 		/* i am an error */
 		break;
 
 	case 0:;
+		/* i am the child */
 		static char fa[64];
 		static char fb[64];
 
-		/* i am the child */
 		close(STDIN_FILENO);
 		close(STDOUT_FILENO);
 		/* kick the write ends of our pipes */
@@ -290,9 +332,10 @@ diff_bits(clit_bit_t exp, clit_bit_t is)
 		_exit(EXIT_FAILURE);
 
 	default:;
+		/* i am the parent */
 		int st;
 
-		/* i am the parent, clean up descriptors */
+		/* clean up descriptors */
 		close(*pin_a);
 		close(*pin_b);
 
@@ -341,7 +384,6 @@ static int
 init_tst(struct clit_chld_s ctx[static 1])
 {
 /* set up a connection with /bin/sh to pipe to and read from */
-	int pty;
 	int pin[2];
 	int pou[2];
 
@@ -355,19 +397,23 @@ init_tst(struct clit_chld_s ctx[static 1])
 		return -1;
 	}
 
-	/* allow both vfork() and forkpty() if requested */
-	switch ((ctx->chld = 1 ? vfork() : forkpty(&pty, NULL, NULL, NULL))) {
+	switch ((ctx->chld = myfork())) {
 	case -1:
 		/* i am an error */
 		return -1;
 
 	case 0:
-		/* i am the child, read from pin and write to pou */
-		if (1) {
+		/* i am the child */
+
+		/* read from pin and write to pou */
+		if (!pty) {
 			close(STDIN_FILENO);
 			close(STDOUT_FILENO);
 			/* pin[0] ->stdin */
 			dup2(pin[0], STDIN_FILENO);
+			close(pin[1]);
+		} else {
+			close(pin[0]);
 			close(pin[1]);
 		}
 		/* stdout -> pou[1] */
@@ -379,13 +425,14 @@ init_tst(struct clit_chld_s ctx[static 1])
 
 	default:
 		/* i am the parent, clean up descriptors */
-		if (1) {
-			close(pin[0]);
+		close(pin[0]);
+		if (pty) {
+			close(pin[1]);
 		}
 		close(pou[1]);
 
 		/* assign desc, write end of pin */
-		if (1) {
+		if (!pty) {
 			ctx->pin = pin[1];
 		} else {
 			ctx->pin = pty;
