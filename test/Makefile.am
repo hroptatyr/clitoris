@@ -14,7 +14,7 @@ check_PROGRAMS =
 
 TEST_EXTENSIONS += .clit
 CLIT_LOG_COMPILER = $(top_builddir)/src/clitoris
-AM_CLIT_LOG_FLAGS = --builddir $(builddir)
+AM_CLIT_LOG_FLAGS = --builddir $(builddir) --verbose
 
 TESTS += $(XFAIL_TESTS)
 
