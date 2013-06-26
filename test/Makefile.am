@@ -10,10 +10,11 @@ EXTRA_DIST = $(BUILT_SOURCES) $(TESTS) $(XFAIL_TESTS)
 TESTS =
 XFAIL_TESTS =
 TEST_EXTENSIONS =
+check_PROGRAMS =
 
 TEST_EXTENSIONS += .clit
 CLIT_LOG_COMPILER = $(top_builddir)/src/clitoris
-AM_CLIT_LOG_FLAGS = --builddir $(top_builddir)/src
+AM_CLIT_LOG_FLAGS = --builddir $(builddir) --verbose
 
 TESTS += $(XFAIL_TESTS)
 
@@ -28,5 +29,8 @@ XFAIL_TESTS += diff_02.clit
 
 XFAIL_TESTS += early_01.clit
 XFAIL_TESTS += early_02.clit
+
+check_PROGRAMS += tty_01
+TESTS += tty_01.clit
 
 ## Makefile.am ends here

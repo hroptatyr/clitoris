@@ -1,0 +1,6 @@
+#!/usr/bin/clitoris  ## -*- shell-script -*-
+
+setopt pseudo-tty
+
+$ tty_01
+$

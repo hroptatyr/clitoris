@@ -85,6 +85,9 @@ struct clit_chld_s {
 	int pou;
 	int pll;
 	pid_t chld;
+
+	unsigned int verbosep:1;
+	unsigned int ptyp:1;
 };
 
 /* a test is the command (inlcuding stdin), stdout result, and stderr result */
@@ -95,9 +98,9 @@ struct clit_tst_s {
 	clit_bit_t rest;
 };
 
-static int verbosep;
 
 static sigset_t fatal_signal_set[1];
+static sigset_t empty_signal_set[1];
 
 
 static void
@@ -145,11 +148,30 @@ block_sigs(void)
 static void
 unblock_sigs(void)
 {
-	sigset_t empty;
-
-	sigemptyset(&empty);
-	sigprocmask(SIG_SETMASK, &empty, (sigset_t*)NULL);
+	sigprocmask(SIG_SETMASK, empty_signal_set, (sigset_t*)NULL);
 	return;
+}
+
+static void
+redir_sigs(void)
+{
+/* block sighup */
+	sigset_t ptyhup[1];
+
+	sigemptyset(ptyhup);
+	sigaddset(ptyhup, SIGHUP);
+	sigprocmask(SIG_SETMASK, ptyhup, (sigset_t*)NULL);
+	return;
+}
+
+static pid_t
+pfork(int *pty)
+{
+	if (UNLIKELY(pty == NULL)) {
+		errno = ENOMEM;
+		return -1;
+	}
+	return forkpty(pty, NULL, NULL, NULL);
 }
 
 
@@ -254,17 +276,57 @@ fail:
 }
 
 static int
+find_opt(struct clit_chld_s ctx[static 1], const char *bp, size_t bz)
+{
+	static const char magic[] = "setopt ";
+
+	for (const char *mp;
+	     (mp = memmem(bp, bz, magic, sizeof(magic) - 1)) != NULL;
+	     bz -= (mp + 1U) - bp, bp = mp + 1U) {
+		unsigned int opt;
+
+		/* check if it's setopt or unsetopt */
+		if (mp == bp || LIKELY(mp[-1] == '\n')) {
+			/* yay, it's a genuine setopt */
+			opt = 1U;
+		} else if (mp >= bp + 2U && mp[-2] == 'u' && mp[-1] == 'n' &&
+			   (mp == bp + 2U || mp > bp + 2U && mp[-3] == '\n')) {
+			/* it's a genuine unsetopt */
+			opt = 0U;
+		} else {
+			/* found rubbish then */
+			mp += sizeof(magic) - 1U;
+			continue;
+		}
+#define CMP(x, lit)	(strncmp((x), (lit), sizeof(lit) - 1))
+		/* parse the option value */
+		if ((mp += sizeof(magic) - 1U) == NULL) {
+			;
+		} else if (CMP(mp, "verbose\n") == 0) {
+			ctx->verbosep = opt;
+		} else if (CMP(mp, "pseudo-tty\n") == 0) {
+			ctx->ptyp = opt;
+		}
+#undef CMP
+	}
+	return 0;
+}
+
+static int
 init_chld(struct clit_chld_s ctx[static 1])
 {
 	ctx->pll = epoll_create1(EPOLL_CLOEXEC);
 
 	/* set up the set of fatal signals */
+	sigemptyset(fatal_signal_set);
 	sigaddset(fatal_signal_set, SIGHUP);
 	sigaddset(fatal_signal_set, SIGQUIT);
 	sigaddset(fatal_signal_set, SIGINT);
 	sigaddset(fatal_signal_set, SIGTERM);
 	sigaddset(fatal_signal_set, SIGXCPU);
 	sigaddset(fatal_signal_set, SIGXFSZ);
+	/* also the empty set */
+	sigemptyset(empty_signal_set);
 	return 0;
 }
 
@@ -329,7 +391,7 @@ diff_bits(clit_bit_t exp, clit_bit_t is)
 		close(*pin_a);
 		close(*pin_b);
 
-		/* just to be on the safe side, send a false */
+		/* feed the stuff we want diff'd to the descriptors */
 		write(pin_a[1], exp.d, exp.z);
 		write(pin_b[1], is.d, is.z);
 		close(pin_a[1]);
@@ -376,7 +438,7 @@ static int
 init_tst(struct clit_chld_s ctx[static 1])
 {
 /* set up a connection with /bin/sh to pipe to and read from */
-	int pty = 0;
+	int pty;
 	int pin[2];
 	int pou[2];
 
@@ -391,7 +453,7 @@ init_tst(struct clit_chld_s ctx[static 1])
 	}
 
 	block_sigs();
-	switch ((ctx->chld = vfork())) {
+	switch ((ctx->chld = LIKELY(!ctx->ptyp) ? vfork() : pfork(&pty))) {
 	case -1:
 		/* i am an error */
 		unblock_sigs();
@@ -400,9 +462,14 @@ init_tst(struct clit_chld_s ctx[static 1])
 	case 0:
 		/* i am the child */
 		unblock_sigs();
+		if (UNLIKELY(ctx->ptyp)) {
+			/* in pty mode make sure we block SIGHUP so we
+			 * actually get the exit status of the shell */
+			redir_sigs();
+		}
 
 		/* read from pin and write to pou */
-		if (!pty) {
+		if (LIKELY(!ctx->ptyp)) {
 			close(STDIN_FILENO);
 			close(STDOUT_FILENO);
 			/* pin[0] ->stdin */
@@ -422,13 +489,13 @@ init_tst(struct clit_chld_s ctx[static 1])
 	default:
 		/* i am the parent, clean up descriptors */
 		close(pin[0]);
-		if (pty) {
+		if (UNLIKELY(ctx->ptyp)) {
 			close(pin[1]);
 		}
 		close(pou[1]);
 
 		/* assign desc, write end of pin */
-		if (!pty) {
+		if (LIKELY(!ctx->ptyp)) {
 			ctx->pin = pin[1];
 		} else {
 			ctx->pin = pty;
@@ -464,10 +531,6 @@ fini_tst(struct clit_chld_s ctx[static 1])
 	while (waitpid(ctx->chld, &st, 0) != ctx->chld);
 	if (WIFEXITED(st)) {
 		return WEXITSTATUS(st);
-	} else if (WIFSIGNALED(st)) {
-		if (WTERMSIG(st) == SIGTERM) {
-			return 0;
-		}
 	}
 	return -1;
 }
@@ -504,6 +567,9 @@ run_tst(struct clit_chld_s ctx[static 1], struct clit_tst_s tst[static 1])
 }
 
 
+static int verbosep;
+static int ptyp;
+
 static int
 test_f(clitf_t tf)
 {
@@ -516,12 +582,23 @@ test_f(clitf_t tf)
 	if (UNLIKELY(init_chld(ctx) < 0)) {
 		return -1;
 	}
+
+	/* preset options */
+	if (verbosep) {
+		ctx->verbosep = 1U;
+	}
+	if (ptyp) {
+		ctx->ptyp = 1U;
+	}
+	/* find options in the test script */
+	find_opt(ctx, bp, bz);
+
 	for (; find_tst(tst, bp, bz) == 0; bp = tst->rest.d, bz = tst->rest.z) {
-		if (verbosep) {
+		if (ctx->verbosep) {
 			fwrite(tst->cmd.d, sizeof(char), tst->cmd.z, stderr);
 		}
 		if ((rc = run_tst(ctx, tst))) {
-			if (verbosep) {
+			if (ctx->verbosep) {
 				fprintf(stderr, "$? %d\n", rc);
 			}
 			break;
@@ -596,6 +673,9 @@ main(int argc, char *argv[])
 	}
 	if (argi->verbose_given) {
 		verbosep = 1;
+	}
+	if (argi->pseudo_tty_given) {
+		ptyp = 1;
 	}
 
 	/* also bang builddir to path */
