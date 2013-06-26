@@ -96,7 +96,6 @@ struct clit_tst_s {
 };
 
 static int verbosep;
-static int pty;
 
 static sigset_t fatal_signal_set[1];
 
@@ -151,20 +150,6 @@ unblock_sigs(void)
 	sigemptyset(&empty);
 	sigprocmask(SIG_SETMASK, &empty, (sigset_t*)NULL);
 	return;
-}
-
-static pid_t
-myfork(void)
-{
-	pid_t res;
-
-	block_sigs();
-
-	/* allow both vfork() and forkpty() if requested */
-	res = vfork();
-
-	unblock_sigs();
-	return res;
 }
 
 
@@ -305,15 +290,20 @@ diff_bits(clit_bit_t exp, clit_bit_t is)
 		return -1;
 	}
 
-	switch ((difftool = myfork())) {
+	block_sigs();
+
+	switch ((difftool = vfork())) {
 	case -1:
 		/* i am an error */
+		unblock_sigs();
 		break;
 
 	case 0:;
 		/* i am the child */
 		static char fa[64];
 		static char fb[64];
+
+		unblock_sigs();
 
 		close(STDIN_FILENO);
 		close(STDOUT_FILENO);
@@ -344,6 +334,8 @@ diff_bits(clit_bit_t exp, clit_bit_t is)
 		write(pin_b[1], is.d, is.z);
 		close(pin_a[1]);
 		close(pin_b[1]);
+
+		unblock_sigs();
 
 		while (waitpid(difftool, &st, 0) != difftool);
 		if (WIFEXITED(st)) {
@@ -384,6 +376,7 @@ static int
 init_tst(struct clit_chld_s ctx[static 1])
 {
 /* set up a connection with /bin/sh to pipe to and read from */
+	int pty = 0;
 	int pin[2];
 	int pou[2];
 
@@ -397,13 +390,16 @@ init_tst(struct clit_chld_s ctx[static 1])
 		return -1;
 	}
 
-	switch ((ctx->chld = myfork())) {
+	block_sigs();
+	switch ((ctx->chld = vfork())) {
 	case -1:
 		/* i am an error */
+		unblock_sigs();
 		return -1;
 
 	case 0:
 		/* i am the child */
+		unblock_sigs();
 
 		/* read from pin and write to pou */
 		if (!pty) {
@@ -464,6 +460,7 @@ fini_tst(struct clit_chld_s ctx[static 1])
 	close(ctx->pin);
 	close(ctx->pou);
 
+	unblock_sigs();
 	while (waitpid(ctx->chld, &st, 0) != ctx->chld);
 	if (WIFEXITED(st)) {
 		return WEXITSTATUS(st);
