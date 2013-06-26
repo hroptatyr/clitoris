@@ -152,18 +152,6 @@ unblock_sigs(void)
 	return;
 }
 
-static void
-redir_sigs(void)
-{
-/* block sighup */
-	sigset_t ptyhup[1];
-
-	sigemptyset(ptyhup);
-	sigaddset(ptyhup, SIGHUP);
-	sigprocmask(SIG_SETMASK, ptyhup, (sigset_t*)NULL);
-	return;
-}
-
 static pid_t
 pfork(int *pty)
 {
@@ -463,9 +451,8 @@ init_tst(struct clit_chld_s ctx[static 1])
 		/* i am the child */
 		unblock_sigs();
 		if (UNLIKELY(ctx->ptyp)) {
-			/* in pty mode make sure we block SIGHUP so we
-			 * actually get the exit status of the shell */
-			redir_sigs();
+			/* in pty mode connect child's stderr to parent's */
+			;
 		}
 
 		/* read from pin and write to pou */
@@ -529,14 +516,23 @@ run_tst(struct clit_chld_s ctx[static 1], struct clit_tst_s tst[static 1])
 
 	unblock_sigs();
 
-	/* indicate we're not writing anymore stuff on the child's stdin */
-	close(ctx->pin);
+	if (LIKELY(!ctx->ptyp)) {
+		/* indicate we're not writing anymore on the child's stdin */
+		close(ctx->pin);
+	} else {
+		write(ctx->pin, "exit $?\n", 8U);
+	}
 
 	while (waitpid(ctx->chld, &st, 0) != ctx->chld);
 	if (LIKELY(WIFEXITED(st))) {
 		rc = WEXITSTATUS(st);
 	} else {
 		rc = 1;
+	}
+
+	if (UNLIKELY(ctx->ptyp)) {
+		/* also close child's stdin here */
+		close(ctx->pin);
 	}
 
 	/* snarf child's stdout */
