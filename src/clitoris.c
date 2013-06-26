@@ -83,6 +83,7 @@ struct clit_bit_s {
 struct clit_chld_s {
 	int pin;
 	int pou;
+	int per;
 	int pll;
 	pid_t chld;
 
@@ -429,6 +430,7 @@ init_tst(struct clit_chld_s ctx[static 1])
 	int pty;
 	int pin[2];
 	int pou[2];
+	int per[2];
 
 	if (0) {
 		;
@@ -436,6 +438,9 @@ init_tst(struct clit_chld_s ctx[static 1])
 		ctx->chld = -1;
 		return -1;
 	} else if (UNLIKELY(pipe(pou) < 0)) {
+		ctx->chld = -1;
+		return -1;
+	} else if (UNLIKELY(ctx->ptyp && pipe(per) < 0)) {
 		ctx->chld = -1;
 		return -1;
 	}
@@ -461,6 +466,11 @@ init_tst(struct clit_chld_s ctx[static 1])
 			close(STDOUT_FILENO);
 			/* pin[0] ->stdin */
 			dup2(pin[0], STDIN_FILENO);
+		} else {
+			close(STDERR_FILENO);
+			dup2(per[1], STDERR_FILENO);
+			close(per[0]);
+			close(per[1]);
 		}
 		close(pin[0]);
 		close(pin[1]);
@@ -486,6 +496,8 @@ init_tst(struct clit_chld_s ctx[static 1])
 			ctx->pin = pin[1];
 		} else {
 			ctx->pin = pty;
+			ctx->per = per[0];
+			close(per[1]);
 		}
 		/* ... and read end of pou */
 		ctx->pou = pou[0];
@@ -552,6 +564,14 @@ run_tst(struct clit_chld_s ctx[static 1], struct clit_tst_s tst[static 1])
 
 	/* now indicate we won't be reading stuff from now on */
 	close(ctx->pou);
+	/* also connect per's out end with stderr */
+	if (UNLIKELY(ctx->ptyp)) {
+		for (ssize_t nsp;
+		     (nsp = splice(
+			      ctx->per, NULL, STDERR_FILENO, NULL,
+			      4096U, SPLICE_F_MOVE)) == 4096U;);
+		close(ctx->per);
+	}
 	return rc;
 }
 
