@@ -83,6 +83,7 @@ struct clit_bit_s {
 struct clit_chld_s {
 	int pin;
 	int pou;
+	int per;
 	int pll;
 	pid_t chld;
 
@@ -149,18 +150,6 @@ static void
 unblock_sigs(void)
 {
 	sigprocmask(SIG_SETMASK, empty_signal_set, (sigset_t*)NULL);
-	return;
-}
-
-static void
-redir_sigs(void)
-{
-/* block sighup */
-	sigset_t ptyhup[1];
-
-	sigemptyset(ptyhup);
-	sigaddset(ptyhup, SIGHUP);
-	sigprocmask(SIG_SETMASK, ptyhup, (sigset_t*)NULL);
 	return;
 }
 
@@ -441,6 +430,7 @@ init_tst(struct clit_chld_s ctx[static 1])
 	int pty;
 	int pin[2];
 	int pou[2];
+	int per[2];
 
 	if (0) {
 		;
@@ -448,6 +438,9 @@ init_tst(struct clit_chld_s ctx[static 1])
 		ctx->chld = -1;
 		return -1;
 	} else if (UNLIKELY(pipe(pou) < 0)) {
+		ctx->chld = -1;
+		return -1;
+	} else if (UNLIKELY(ctx->ptyp && pipe(per) < 0)) {
 		ctx->chld = -1;
 		return -1;
 	}
@@ -463,9 +456,8 @@ init_tst(struct clit_chld_s ctx[static 1])
 		/* i am the child */
 		unblock_sigs();
 		if (UNLIKELY(ctx->ptyp)) {
-			/* in pty mode make sure we block SIGHUP so we
-			 * actually get the exit status of the shell */
-			redir_sigs();
+			/* in pty mode connect child's stderr to parent's */
+			;
 		}
 
 		/* read from pin and write to pou */
@@ -474,14 +466,19 @@ init_tst(struct clit_chld_s ctx[static 1])
 			close(STDOUT_FILENO);
 			/* pin[0] ->stdin */
 			dup2(pin[0], STDIN_FILENO);
-			close(pin[1]);
 		} else {
-			close(pin[0]);
-			close(pin[1]);
+			close(STDERR_FILENO);
+			dup2(per[1], STDERR_FILENO);
+			close(per[0]);
+			close(per[1]);
 		}
+		close(pin[0]);
+		close(pin[1]);
+
 		/* stdout -> pou[1] */
 		dup2(pou[1], STDOUT_FILENO);
 		close(pou[0]);
+		close(pou[1]);
 		execl("/bin/sh", "sh", NULL);
 		error(0, "execl failed");
 		_exit(EXIT_FAILURE);
@@ -499,13 +496,15 @@ init_tst(struct clit_chld_s ctx[static 1])
 			ctx->pin = pin[1];
 		} else {
 			ctx->pin = pty;
+			ctx->per = per[0];
+			close(per[1]);
 		}
 		/* ... and read end of pou */
 		ctx->pou = pou[0];
 
 		if (LIKELY(ctx->pll >= 0)) {
 			static struct epoll_event ev = {
-				EPOLLIN | EPOLLRDHUP | EPOLLHUP | EPOLLONESHOT,
+				EPOLLIN | EPOLLONESHOT,
 			};
 			epoll_ctl(ctx->pll, EPOLL_CTL_ADD, ctx->pou, &ev);
 		}
@@ -515,53 +514,63 @@ init_tst(struct clit_chld_s ctx[static 1])
 }
 
 static int
-fini_tst(struct clit_chld_s ctx[static 1])
-{
-	int st;
-
-	if (UNLIKELY(ctx->chld == -1)) {
-		return -1;
-	}
-
-	/* and indicate end of pipes */
-	close(ctx->pin);
-	close(ctx->pou);
-
-	unblock_sigs();
-	while (waitpid(ctx->chld, &st, 0) != ctx->chld);
-	if (WIFEXITED(st)) {
-		return WEXITSTATUS(st);
-	}
-	return -1;
-}
-
-static int
 run_tst(struct clit_chld_s ctx[static 1], struct clit_tst_s tst[static 1])
 {
 	static struct epoll_event ev[1];
-	int rc = 0;
+	int st;
+	int rc;
+	int nev;
 
-	init_tst(ctx);
-	write(ctx->pin, tst->cmd.d, tst->cmd.z);
-	if (tst->out.z > 0U) {
-		if (epoll_wait(ctx->pll, ev, countof(ev), 2000/*ms*/) <= 0) {
-			/* indicate timeout */
-			puts("timeout");
-			rc = -1;
-		} else {
-			rc = diff_out(ctx, tst->out);
-		}
-	} else {
-		/* we expect no output, check if there is some anyway */
-		if (epoll_wait(ctx->pll, ev, countof(ev), 10/*ms*/) > 0) {
-			puts("output present but not expected");
-			rc = -1;
-		}
+	if (UNLIKELY(init_tst(ctx) < 0)) {
+		return -1;
 	}
-	with (int fin_rc = fini_tst(ctx)) {
-		if (rc >= 0 && fin_rc) {
-			rc = fin_rc;
-		}
+	write(ctx->pin, tst->cmd.d, tst->cmd.z);
+
+	unblock_sigs();
+
+	if (LIKELY(!ctx->ptyp)) {
+		/* indicate we're not writing anymore on the child's stdin */
+		close(ctx->pin);
+	} else {
+		write(ctx->pin, "exit $?\n", 8U);
+	}
+
+	while (waitpid(ctx->chld, &st, 0) != ctx->chld);
+	if (LIKELY(WIFEXITED(st))) {
+		rc = WEXITSTATUS(st);
+	} else {
+		rc = 1;
+	}
+
+	if (UNLIKELY(ctx->ptyp)) {
+		/* also close child's stdin here */
+		close(ctx->pin);
+	}
+
+	/* snarf child's stdout */
+	errno = 0;
+	if (UNLIKELY((nev = epoll_wait(ctx->pll, ev, countof(ev), 0)) < 0)) {
+		/* uh oh */
+		;
+	} else if (tst->out.z > 0U && (nev == 0 || !(ev[0].events & EPOLLIN))) {
+		error(0, "output expected, none there");
+		rc = -1;
+	} else if (tst->out.z > 0U && (ev[0].events & EPOLLIN)) {
+		rc = diff_out(ctx, tst->out);
+	} else if (tst->out.z == 0U && nev > 0 && (ev[0].events & EPOLLIN)) {
+		error(0, "output present but not expected");
+		rc = -1;
+	}
+
+	/* now indicate we won't be reading stuff from now on */
+	close(ctx->pou);
+	/* also connect per's out end with stderr */
+	if (UNLIKELY(ctx->ptyp)) {
+		for (ssize_t nsp;
+		     (nsp = splice(
+			      ctx->per, NULL, STDERR_FILENO, NULL,
+			      4096U, SPLICE_F_MOVE)) == 4096U;);
+		close(ctx->per);
 	}
 	return rc;
 }
