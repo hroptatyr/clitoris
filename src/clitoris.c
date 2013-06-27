@@ -82,12 +82,18 @@ struct clit_buf_s {
 	const char *d;
 };
 
+/**
+ * A clit bit can be an ordinary memory buffer (z > 0 && d),
+ * a file descriptor (fd != 0 && d == NULL), or a file name (z == -1UL && fn) */
 struct clit_bit_s {
 	union {
 		size_t z;
 		int fd;
 	};
-	const char *d;
+	union {
+		const char *d;
+		const char *fn;
+	};
 };
 
 struct clit_chld_s {
@@ -134,13 +140,19 @@ error(int eno, const char *fmt, ...)
 static inline __attribute__((const, pure)) bool
 clit_bit_buf_p(clit_bit_t x)
 {
-	return x.d != NULL;
+	return x.z != -1UL && x.d != NULL;
 }
 
 static inline __attribute__((const, pure)) bool
 clit_bit_fd_p(clit_bit_t x)
 {
 	return x.d == NULL;
+}
+
+static inline __attribute__((const, pure)) bool
+clit_bit_fn_p(clit_bit_t x)
+{
+	return x.z == -1UL && x.d != NULL;
 }
 
 
@@ -359,25 +371,29 @@ feed_bit(int where, clit_bit_t bit)
 }
 
 static int
+pipe_bits(int p[static 2], clit_bit_t b)
+{
+	if (clit_bit_buf_p(b) && UNLIKELY(pipe(p)) < 0) {
+		return -1;
+	} else if (clit_bit_fd_p(b)) {
+		p[0] = b.fd;
+		p[1] = -1;
+	} else if (clit_bit_fn_p(b)) {
+		p[0] = -1;
+		p[1] = -1;
+	}
+	return 0;
+}
+
+static int
 diff_bits(clit_bit_t exp, clit_bit_t is)
 {
 	int pin_a[2];
 	int pin_b[2];
 	pid_t difftool;
 
-	if (0) {
-		;
-	} else if (clit_bit_buf_p(exp) && UNLIKELY(pipe(pin_a) < 0)) {
-		return -1;
-	} else if (clit_bit_fd_p(exp)) {
-		*pin_a = exp.fd;
-		pin_a[1] = -1;
-	} else if (clit_bit_buf_p(is) && UNLIKELY(pipe(pin_b) < 0)) {
-		return -1;
-	} else if (clit_bit_fd_p(is)) {
-		*pin_b = is.fd;
-		pin_b[1] = -1;
-	}
+	pipe_bits(pin_a, exp);
+	pipe_bits(pin_b, is);
 
 	block_sigs();
 
@@ -408,8 +424,16 @@ diff_bits(clit_bit_t exp, clit_bit_t is)
 		/* stdout -> stderr */
 		dup2(STDERR_FILENO, STDOUT_FILENO);
 
-		snprintf(fa, sizeof(fa), "/dev/fd/%d", *pin_a);
-		snprintf(fb, sizeof(fb), "/dev/fd/%d", *pin_b);
+		if (!clit_bit_fn_p(exp)) {
+			snprintf(fa, sizeof(fa), "/dev/fd/%d", *pin_a);
+		} else {
+			snprintf(fa, sizeof(fa), "%s", exp.fn);
+		}
+		if (!clit_bit_fn_p(is)) {
+			snprintf(fb, sizeof(fb), "/dev/fd/%d", *pin_b);
+		} else {
+			snprintf(fb, sizeof(fb), "%s", is.fn);
+		}
 
 		execvp("diff", diff_opt);
 		error(0, "execlp failed");
