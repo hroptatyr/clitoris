@@ -41,6 +41,7 @@
 #include <stdarg.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <stdbool.h>
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
@@ -67,6 +68,7 @@
 
 
 typedef struct clitf_s clitf_t;
+typedef struct clit_buf_s clit_buf_t;
 typedef struct clit_bit_s clit_bit_t;
 typedef struct clit_tst_s *clit_tst_t;
 
@@ -75,8 +77,16 @@ struct clitf_s {
 	void *d;
 };
 
-struct clit_bit_s {
+struct clit_buf_s {
 	size_t z;
+	const char *d;
+};
+
+struct clit_bit_s {
+	union {
+		size_t z;
+		int fd;
+	};
 	const char *d;
 };
 
@@ -119,6 +129,18 @@ error(int eno, const char *fmt, ...)
 	}
 	fputc('\n', stderr);
 	return;
+}
+
+static inline __attribute__((const, pure)) bool
+clit_bit_buf_p(clit_bit_t x)
+{
+	return x.d != NULL;
+}
+
+static inline __attribute__((const, pure)) bool
+clit_bit_fd_p(clit_bit_t x)
+{
+	return x.d == NULL;
 }
 
 
@@ -326,6 +348,16 @@ fini_chld(struct clit_chld_s ctx[static 1])
 	return close(ctx->pll);
 }
 
+static inline void
+feed_bit(int where, clit_bit_t bit)
+{
+	if (clit_bit_buf_p(bit)) {
+		write(where, bit.d, bit.z);
+	}
+	close(where);
+	return;
+}
+
 static int
 diff_bits(clit_bit_t exp, clit_bit_t is)
 {
@@ -335,10 +367,16 @@ diff_bits(clit_bit_t exp, clit_bit_t is)
 
 	if (0) {
 		;
-	} else if (UNLIKELY(pipe(pin_a) < 0)) {
+	} else if (clit_bit_buf_p(exp) && UNLIKELY(pipe(pin_a) < 0)) {
 		return -1;
-	} else if (UNLIKELY(pipe(pin_b) < 0)) {
+	} else if (clit_bit_fd_p(exp)) {
+		*pin_a = exp.fd;
+		pin_a[1] = -1;
+	} else if (clit_bit_buf_p(is) && UNLIKELY(pipe(pin_b) < 0)) {
 		return -1;
+	} else if (clit_bit_fd_p(is)) {
+		*pin_b = is.fd;
+		pin_b[1] = -1;
 	}
 
 	block_sigs();
@@ -381,10 +419,8 @@ diff_bits(clit_bit_t exp, clit_bit_t is)
 		close(*pin_b);
 
 		/* feed the stuff we want diff'd to the descriptors */
-		write(pin_a[1], exp.d, exp.z);
-		write(pin_b[1], is.d, is.z);
-		close(pin_a[1]);
-		close(pin_b[1]);
+		feed_bit(pin_a[1], exp);
+		feed_bit(pin_b[1], is);
 
 		unblock_sigs();
 
