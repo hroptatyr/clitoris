@@ -1,6 +1,6 @@
 ## -*- shell-script -*-
 
-$ ls
+$ ls "${srcdir}"/*.clit
 < tmp.ls.out
 $ rm -f -- ls.out
 $
