@@ -532,10 +532,8 @@ init_tst(struct clit_chld_s ctx[static 1])
 static int
 run_tst(struct clit_chld_s ctx[static 1], struct clit_tst_s tst[static 1])
 {
-	static struct epoll_event ev[1];
 	int st;
 	int rc;
-	int nev;
 
 	if (UNLIKELY(init_tst(ctx) < 0)) {
 		return -1;
@@ -551,9 +549,11 @@ run_tst(struct clit_chld_s ctx[static 1], struct clit_tst_s tst[static 1])
 		write(ctx->pin, "exit $?\n", 8U);
 	}
 
+	rc = diff_out(ctx, tst->out);
+
 	while (waitpid(ctx->chld, &st, 0) != ctx->chld);
 	if (LIKELY(WIFEXITED(st))) {
-		rc = WEXITSTATUS(st);
+		rc = rc ?: WEXITSTATUS(st);
 	} else {
 		rc = 1;
 	}
@@ -561,21 +561,6 @@ run_tst(struct clit_chld_s ctx[static 1], struct clit_tst_s tst[static 1])
 	if (UNLIKELY(ctx->ptyp)) {
 		/* also close child's stdin here */
 		close(ctx->pin);
-	}
-
-	/* snarf child's stdout */
-	errno = 0;
-	if (UNLIKELY((nev = epoll_wait(ctx->pll, ev, countof(ev), 0)) < 0)) {
-		/* uh oh */
-		;
-	} else if (tst->out.z > 0U && (nev == 0 || !(ev[0].events & EPOLLIN))) {
-		error(0, "output expected, none there");
-		rc = -1;
-	} else if (tst->out.z > 0U && (ev[0].events & EPOLLIN)) {
-		rc = diff_out(ctx, tst->out);
-	} else if (tst->out.z == 0U && nev > 0 && (ev[0].events & EPOLLIN)) {
-		error(0, "output present but not expected");
-		rc = -1;
 	}
 
 	/* now indicate we won't be reading stuff from now on */
