@@ -33,4 +33,7 @@ XFAIL_TESTS += early_02.clit
 check_PROGRAMS += tty_01
 TESTS += tty_01.clit
 
+XFAIL_TESTS += tty_02.clit
+XFAIL_TESTS += tty_03.clit
+
 ## Makefile.am ends here

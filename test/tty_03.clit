@@ -1,0 +1,6 @@
+## -*- shell-script -*-
+
+setopt pseudo-tty
+
+$ ls
+$
