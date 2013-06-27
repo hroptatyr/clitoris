@@ -436,27 +436,7 @@ diff_bits(clit_bit_t exp, clit_bit_t is)
 static int
 diff_out(struct clit_chld_s ctx[static 1], clit_bit_t exp)
 {
-	static char *buf;
-	static size_t bsz;
-	ssize_t nrd;
-	int rc = 0;
-
-	/* check and maybe realloc read buffer */
-	if (exp.z > bsz) {
-		bsz = ((exp.z / 4096U) + 1U) * 4096U;
-		buf = realloc(buf, bsz);
-	}
-
-	if ((nrd = read(ctx->pou, buf, bsz)) < 0) {
-		rc = 1;
-	} else if (nrd != exp.z || memcmp(buf, exp.d, exp.z)) {
-		clit_bit_t is = {.z = (size_t)nrd, .d = buf};
-
-		/* best to leave a note in any case */
-		fputs("output differs\n", stderr);
-		rc = diff_bits(exp, is);
-	}
-	return rc;
+	return diff_bits(exp, (clit_bit_t){.fd = ctx->pou});
 }
 
 static int
