@@ -1,0 +1,4 @@
+## -*- shell-script -*-
+
+$ ls > tmp.ls.out
+$

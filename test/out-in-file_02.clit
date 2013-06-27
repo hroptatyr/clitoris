@@ -1,0 +1,6 @@
+## -*- shell-script -*-
+
+$ ls
+< tmp.ls.out
+$ rm -f -- ls.out
+$
