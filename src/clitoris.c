@@ -155,6 +155,19 @@ clit_bit_fn_p(clit_bit_t x)
 	return x.z == -1UL && x.d != NULL;
 }
 
+/* ctors */
+static inline clit_bit_t
+clit_make_fd(int fd)
+{
+	return (clit_bit_t){.fd = fd};
+}
+
+static inline clit_bit_t
+clit_make_fn(const char *fn)
+{
+	return (clit_bit_t){.z = -1UL, .fn = fn};
+}
+
 
 static clitf_t
 mmap_fd(int fd, size_t fz)
@@ -465,7 +478,7 @@ diff_bits(clit_bit_t exp, clit_bit_t is)
 static int
 diff_out(struct clit_chld_s ctx[static 1], clit_bit_t exp)
 {
-	return diff_bits(exp, (clit_bit_t){.fd = ctx->pou});
+	return diff_bits(exp, clit_make_fd(ctx->pou));
 }
 
 static int
