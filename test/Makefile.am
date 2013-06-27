@@ -36,4 +36,8 @@ TESTS += tty_01.clit
 XFAIL_TESTS += tty_02.clit
 XFAIL_TESTS += tty_03.clit
 
+TESTS += out-in-file_01.clit
+TESTS += out-in-file_02.clit
+out-in-file_02.log: out-in-file_01.log
+
 ## Makefile.am ends here
