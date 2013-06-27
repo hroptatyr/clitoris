@@ -41,6 +41,7 @@
 #include <stdarg.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <stdbool.h>
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
@@ -67,6 +68,7 @@
 
 
 typedef struct clitf_s clitf_t;
+typedef struct clit_buf_s clit_buf_t;
 typedef struct clit_bit_s clit_bit_t;
 typedef struct clit_tst_s *clit_tst_t;
 
@@ -75,8 +77,16 @@ struct clitf_s {
 	void *d;
 };
 
-struct clit_bit_s {
+struct clit_buf_s {
 	size_t z;
+	const char *d;
+};
+
+struct clit_bit_s {
+	union {
+		size_t z;
+		int fd;
+	};
 	const char *d;
 };
 
@@ -119,6 +129,18 @@ error(int eno, const char *fmt, ...)
 	}
 	fputc('\n', stderr);
 	return;
+}
+
+static inline __attribute__((const, pure)) bool
+clit_bit_buf_p(clit_bit_t x)
+{
+	return x.d != NULL;
+}
+
+static inline __attribute__((const, pure)) bool
+clit_bit_fd_p(clit_bit_t x)
+{
+	return x.d == NULL;
 }
 
 
@@ -326,6 +348,16 @@ fini_chld(struct clit_chld_s ctx[static 1])
 	return close(ctx->pll);
 }
 
+static inline void
+feed_bit(int where, clit_bit_t bit)
+{
+	if (clit_bit_buf_p(bit)) {
+		write(where, bit.d, bit.z);
+	}
+	close(where);
+	return;
+}
+
 static int
 diff_bits(clit_bit_t exp, clit_bit_t is)
 {
@@ -335,10 +367,16 @@ diff_bits(clit_bit_t exp, clit_bit_t is)
 
 	if (0) {
 		;
-	} else if (UNLIKELY(pipe(pin_a) < 0)) {
+	} else if (clit_bit_buf_p(exp) && UNLIKELY(pipe(pin_a) < 0)) {
 		return -1;
-	} else if (UNLIKELY(pipe(pin_b) < 0)) {
+	} else if (clit_bit_fd_p(exp)) {
+		*pin_a = exp.fd;
+		pin_a[1] = -1;
+	} else if (clit_bit_buf_p(is) && UNLIKELY(pipe(pin_b) < 0)) {
 		return -1;
+	} else if (clit_bit_fd_p(is)) {
+		*pin_b = is.fd;
+		pin_b[1] = -1;
 	}
 
 	block_sigs();
@@ -353,6 +391,11 @@ diff_bits(clit_bit_t exp, clit_bit_t is)
 		/* i am the child */
 		static char fa[64];
 		static char fb[64];
+		static char *const diff_opt[] = {
+			"diff",
+			"-u", "--label=expected", "--label=actual",
+			fa, fb, NULL,
+		};
 
 		unblock_sigs();
 
@@ -368,7 +411,7 @@ diff_bits(clit_bit_t exp, clit_bit_t is)
 		snprintf(fa, sizeof(fa), "/dev/fd/%d", *pin_a);
 		snprintf(fb, sizeof(fb), "/dev/fd/%d", *pin_b);
 
-		execlp("diff", "diff", fa, fb, NULL);
+		execvp("diff", diff_opt);
 		error(0, "execlp failed");
 		_exit(EXIT_FAILURE);
 
@@ -381,10 +424,8 @@ diff_bits(clit_bit_t exp, clit_bit_t is)
 		close(*pin_b);
 
 		/* feed the stuff we want diff'd to the descriptors */
-		write(pin_a[1], exp.d, exp.z);
-		write(pin_b[1], is.d, is.z);
-		close(pin_a[1]);
-		close(pin_b[1]);
+		feed_bit(pin_a[1], exp);
+		feed_bit(pin_b[1], is);
 
 		unblock_sigs();
 
@@ -400,27 +441,7 @@ diff_bits(clit_bit_t exp, clit_bit_t is)
 static int
 diff_out(struct clit_chld_s ctx[static 1], clit_bit_t exp)
 {
-	static char *buf;
-	static size_t bsz;
-	ssize_t nrd;
-	int rc = 0;
-
-	/* check and maybe realloc read buffer */
-	if (exp.z > bsz) {
-		bsz = ((exp.z / 4096U) + 1U) * 4096U;
-		buf = realloc(buf, bsz);
-	}
-
-	if ((nrd = read(ctx->pou, buf, bsz)) < 0) {
-		rc = 1;
-	} else if (nrd != exp.z || memcmp(buf, exp.d, exp.z)) {
-		clit_bit_t is = {.z = (size_t)nrd, .d = buf};
-
-		/* best to leave a note in any case */
-		fputs("output differs\n", stderr);
-		rc = diff_bits(exp, is);
-	}
-	return rc;
+	return diff_bits(exp, (clit_bit_t){.fd = ctx->pou});
 }
 
 static int
@@ -516,10 +537,8 @@ init_tst(struct clit_chld_s ctx[static 1])
 static int
 run_tst(struct clit_chld_s ctx[static 1], struct clit_tst_s tst[static 1])
 {
-	static struct epoll_event ev[1];
 	int st;
 	int rc;
-	int nev;
 
 	if (UNLIKELY(init_tst(ctx) < 0)) {
 		return -1;
@@ -535,9 +554,11 @@ run_tst(struct clit_chld_s ctx[static 1], struct clit_tst_s tst[static 1])
 		write(ctx->pin, "exit $?\n", 8U);
 	}
 
+	rc = diff_out(ctx, tst->out);
+
 	while (waitpid(ctx->chld, &st, 0) != ctx->chld);
 	if (LIKELY(WIFEXITED(st))) {
-		rc = WEXITSTATUS(st);
+		rc = rc ?: WEXITSTATUS(st);
 	} else {
 		rc = 1;
 	}
@@ -545,21 +566,6 @@ run_tst(struct clit_chld_s ctx[static 1], struct clit_tst_s tst[static 1])
 	if (UNLIKELY(ctx->ptyp)) {
 		/* also close child's stdin here */
 		close(ctx->pin);
-	}
-
-	/* snarf child's stdout */
-	errno = 0;
-	if (UNLIKELY((nev = epoll_wait(ctx->pll, ev, countof(ev), 0)) < 0)) {
-		/* uh oh */
-		;
-	} else if (tst->out.z > 0U && (nev == 0 || !(ev[0].events & EPOLLIN))) {
-		error(0, "output expected, none there");
-		rc = -1;
-	} else if (tst->out.z > 0U && (ev[0].events & EPOLLIN)) {
-		rc = diff_out(ctx, tst->out);
-	} else if (tst->out.z == 0U && nev > 0 && (ev[0].events & EPOLLIN)) {
-		error(0, "output present but not expected");
-		rc = -1;
 	}
 
 	/* now indicate we won't be reading stuff from now on */
