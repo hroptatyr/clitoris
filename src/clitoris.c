@@ -302,8 +302,24 @@ find_tst(struct clit_tst_s tst[static 1], const char *bp, size_t bz)
 	/* otherwise set the rest bit already */
 	tst->rest.z = bz - (tst->rest.d - bp);
 
-	/* now the stdout and stderr bits must be in between (or 0) */
-	tst->out = (clit_bit_t){.z = tst->rest.d - bp, bp};
+	/* now the stdout bit must be in between (or 0) */
+	with (size_t outz = tst->rest.d - bp) {
+		if (outz &&
+		    /* prefixed '< '? */
+		    UNLIKELY(bp[0] == '<' && bp[1] == ' ') &&
+		    /* not too long */
+		    outz < 256U &&
+		    /* only one line? */
+		    memchr(bp + 2, '\n', outz - 2U - 1U) == NULL) {
+			/* it's a < FILE comparison */
+			static char fn[256U];
+
+			memcpy(fn, bp + 2, outz - 2U - 1U);
+			tst->out = clit_make_fn(fn);
+		} else {
+			tst->out = (clit_bit_t){.z = outz, bp};
+		}
+	}
 	tst->err = (clit_bit_t){0U};
 	return 0;
 fail:
