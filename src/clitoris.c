@@ -391,6 +391,11 @@ diff_bits(clit_bit_t exp, clit_bit_t is)
 		/* i am the child */
 		static char fa[64];
 		static char fb[64];
+		static char *const diff_opt[] = {
+			"diff",
+			"-u", "--label=expected", "--label=actual",
+			fa, fb, NULL,
+		};
 
 		unblock_sigs();
 
@@ -406,7 +411,7 @@ diff_bits(clit_bit_t exp, clit_bit_t is)
 		snprintf(fa, sizeof(fa), "/dev/fd/%d", *pin_a);
 		snprintf(fb, sizeof(fb), "/dev/fd/%d", *pin_b);
 
-		execlp("diff", "diff", fa, fb, NULL);
+		execvp("diff", diff_opt);
 		error(0, "execlp failed");
 		_exit(EXIT_FAILURE);
 
