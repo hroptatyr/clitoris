@@ -2,5 +2,5 @@
 
 $ ls "${srcdir}"/*.clit
 < tmp.ls.out
-$ rm -f -- ls.out
+$ rm -f -- tmp.ls.out
 $
