@@ -697,6 +697,7 @@ test(const char *testfile)
 
 		rc = test_f(tf);
 		munmap_fd(tf);
+		close(fd);
 		return rc;
 	}
 	return -1;
