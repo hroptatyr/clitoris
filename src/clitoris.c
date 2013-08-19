@@ -106,6 +106,8 @@ struct clit_chld_s {
 
 	unsigned int verbosep:1;
 	unsigned int ptyp:1;
+
+	unsigned int timeo;
 };
 
 /* a test is the command (inlcuding stdin), stdout result, and stderr result */
@@ -373,11 +375,10 @@ find_opt(struct clit_chld_s ctx[static 1], const char *bp, size_t bz)
 		} else if (CMP(mp, "timeout") == 0) {
 			const char *arg = mp + sizeof("timeout");
 			char *p;
-			double timeo;
-			static void set_timeout(double duration);
+			long unsigned int timeo;
 
-			if ((timeo = strtod(arg, &p), *p == '\n')) {
-				set_timeout(timeo);
+			if ((timeo = strtoul(arg, &p, 0), *p == '\n')) {
+				ctx->timeo = (unsigned int)timeo;
 			}
 		}
 #undef CMP
@@ -656,19 +657,14 @@ run_tst(struct clit_chld_s ctx[static 1], struct clit_tst_s tst[static 1])
 }
 
 static void
-set_timeout(double duration)
+set_timeout(unsigned int tdiff)
 {
-	unsigned int tdiff;
+	if (UNLIKELY(tdiff == 0U)) {
+		return;
+	}
 
 	/* unblock just this one signal */
 	unblock_sig(SIGALRM);
-
-	if (UNLIKELY(duration >= (double)UINT_MAX)) {
-		tdiff = UINT_MAX;
-	} else {
-		unsigned int tdiff_fl = (unsigned int)duration;
-		tdiff = tdiff_fl + ((double)tdiff_fl < duration);
-	}
 	alarm(tdiff);
 	return;
 }
@@ -676,6 +672,7 @@ set_timeout(double duration)
 
 static int verbosep;
 static int ptyp;
+static unsigned int timeo;
 
 static int
 test_f(clitf_t tf)
@@ -697,9 +694,15 @@ test_f(clitf_t tf)
 	if (ptyp) {
 		ctx->ptyp = 1U;
 	}
+	ctx->timeo = timeo;
+
 	/* find options in the test script */
 	find_opt(ctx, bp, bz);
 
+	/* prepare */
+	if (ctx->timeo > 0) {
+		set_timeout(ctx->timeo);
+	}
 	for (; find_tst(tst, bp, bz) == 0; bp = tst->rest.d, bz = tst->rest.z) {
 		if (ctx->verbosep) {
 			fwrite(tst->cmd.d, sizeof(char), tst->cmd.z, stderr);
@@ -788,7 +791,7 @@ main(int argc, char *argv[])
 		ptyp = 1;
 	}
 	if (argi->timeout_given) {
-		set_timeout(argi->timeout_arg);
+		timeo = argi->timeout_arg;
 	}
 
 	/* also bang builddir to path */
