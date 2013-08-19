@@ -40,4 +40,10 @@ TESTS += out-in-file_01.clit
 TESTS += out-in-file_02.clit
 out-in-file_02.log: out-in-file_01.log
 
+CLIT_LOG_COMPILER += --timeout 2
+TESTS += timeo_01.clit
+XFAIL_TESTS += timeo_02.clit
+XFAIL_TESTS += timeo_03.clit
+TESTS += timeo_04.clit
+
 ## Makefile.am ends here
