@@ -30,3 +30,7 @@ option "verbose" v
 option "pseudo-tty" t
 	"Allocate a pseudo-tty for the tests to run in."
 	optional
+
+option "timeout" -
+	"Time out after SECS seconds."
+	int typestr="SECS" optional
