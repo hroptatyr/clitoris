@@ -370,6 +370,15 @@ find_opt(struct clit_chld_s ctx[static 1], const char *bp, size_t bz)
 			ctx->verbosep = opt;
 		} else if (CMP(mp, "pseudo-tty\n") == 0) {
 			ctx->ptyp = opt;
+		} else if (CMP(mp, "timeout") == 0) {
+			const char *arg = mp + sizeof("timeout");
+			char *p;
+			double timeo;
+			static void set_timeout(double duration);
+
+			if ((timeo = strtod(arg, &p), *p == '\n')) {
+				set_timeout(timeo);
+			}
 		}
 #undef CMP
 	}
