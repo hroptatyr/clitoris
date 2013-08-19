@@ -42,6 +42,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdbool.h>
+#include <limits.h>
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
@@ -197,6 +198,17 @@ static void
 unblock_sigs(void)
 {
 	sigprocmask(SIG_SETMASK, empty_signal_set, (sigset_t*)NULL);
+	return;
+}
+
+static void
+unblock_sig(int sig)
+{
+	static sigset_t unblk_set[1];
+
+	sigemptyset(unblk_set);
+	sigaddset(unblk_set, sig);
+	(void)sigprocmask(SIG_UNBLOCK, unblk_set, (sigset_t*)NULL);
 	return;
 }
 
@@ -634,6 +646,24 @@ run_tst(struct clit_chld_s ctx[static 1], struct clit_tst_s tst[static 1])
 	return rc;
 }
 
+static void
+set_timeout(double duration)
+{
+	unsigned int tdiff;
+
+	/* unblock just this one signal */
+	unblock_sig(SIGALRM);
+
+	if (UNLIKELY(duration >= (double)UINT_MAX)) {
+		tdiff = UINT_MAX;
+	} else {
+		unsigned int tdiff_fl = (unsigned int)duration;
+		tdiff = tdiff_fl + ((double)tdiff_fl < duration);
+	}
+	alarm(tdiff);
+	return;
+}
+
 
 static int verbosep;
 static int ptyp;
@@ -747,6 +777,9 @@ main(int argc, char *argv[])
 	}
 	if (argi->pseudo_tty_given) {
 		ptyp = 1;
+	}
+	if (argi->timeout_given) {
+		set_timeout(argi->timeout_arg);
 	}
 
 	/* also bang builddir to path */
