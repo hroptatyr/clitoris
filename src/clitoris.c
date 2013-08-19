@@ -684,22 +684,25 @@ test(const char *testfile)
 	int fd;
 	struct stat st;
 	clitf_t tf;
+	int rc = -1;
 
 	if ((fd = open(testfile, O_RDONLY)) < 0) {
 		error(0, "Error: cannot open file `%s'", testfile);
 	} else if (fstat(fd, &st) < 0) {
 		error(0, "Error: cannot stat file `%s'", testfile);
+		goto clo;
 	} else if ((tf = mmap_fd(fd, st.st_size)).d == NULL) {
 		error(0, "Error: cannot map file `%s'", testfile);
-	} else {
-		/* yaay */
-		int rc;
-
-		rc = test_f(tf);
-		munmap_fd(tf);
-		return rc;
+		goto clo;
 	}
-	return -1;
+	/* yaay, perform the test */
+	rc = test_f(tf);
+
+	/* and out we are */
+	munmap_fd(tf);
+clo:
+	close(fd);
+	return rc;
 }
 
 
