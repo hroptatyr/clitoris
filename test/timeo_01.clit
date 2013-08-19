@@ -1,0 +1,6 @@
+#!/usr/bin/clitoris  ## -*- shell-script -*-
+
+## should not time out
+
+$ sleep 1
+$
