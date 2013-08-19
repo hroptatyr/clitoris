@@ -1,0 +1,7 @@
+#!/usr/bin/clitoris  ## -*- shell-script -*-
+
+## should time out
+timeout 1
+
+$ sleep 2
+$
