@@ -705,6 +705,7 @@ test_f(clitf_t tf)
 	}
 	for (; find_tst(tst, bp, bz) == 0; bp = tst->rest.d, bz = tst->rest.z) {
 		if (ctx->verbosep) {
+			fputs("$ ", stderr);
 			fwrite(tst->cmd.d, sizeof(char), tst->cmd.z, stderr);
 		}
 		if ((rc = run_tst(ctx, tst))) {
