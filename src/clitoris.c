@@ -812,6 +812,15 @@ main(int argc, char *argv[])
 		timeo = argi->timeout_arg;
 	}
 
+	/* prepend our current directory and our argv[0] directory */
+	with (char *arg0 = argv[0]) {
+		char *dir0;
+		if ((dir0 = strrchr(arg0, '/')) != NULL) {
+			*dir0 = '\0';
+			prepend_path(arg0);
+		}
+	}
+	prepend_path(".");
 	/* also bang builddir to path */
 	with (char *blddir = getenv("builddir")) {
 		if (LIKELY(blddir != NULL)) {
