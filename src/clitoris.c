@@ -672,17 +672,52 @@ set_timeout(unsigned int tdiff)
 static void
 prepend_path(const char *p)
 {
-	size_t pz = strlen(p);
-	char *path = getenv("PATH");
-	size_t patz = strlen(path);
-	char *newp;
+#define free_path()	prepend_path(NULL);
+	static char *paths;
+	static size_t pathz;
+	static char *pp;
+	size_t pz;
 
-	newp = malloc(patz + pz + 1U/*:*/ + 1U/*\nul*/);
-	memcpy(newp, p, pz);
-	newp[pz] = ':';
-	memcpy(newp + pz + 1U, path, patz + 1U);
-	setenv("PATH", newp, 1);
-	free(newp);
+	if (UNLIKELY(p == NULL)) {
+		/* freeing */
+		if (paths == NULL) {
+			free(paths);
+			paths = pp = NULL;
+		}
+		return;
+	}
+	/* otherwise it'd be safe to compute the strlen() methinks */
+	pz = strlen(p);
+
+	if (UNLIKELY(paths == NULL)) {
+		char *envp = getenv("PATH");
+		size_t envz = strlen(envp);
+
+		/* get us a nice big cushion */
+		pathz = ((envz + pz + 1U) / 256U + 1) * 256U;
+		paths = malloc(pathz);
+		/* glue the current path at the end of the array */
+		pp = (paths + pathz) - (envz + 1U);
+		memcpy(pp, envp, envz + 1U);
+	}
+
+	/* calc prepension pointer */
+	pp -= pz + 1U/*:*/;
+
+	if (UNLIKELY(pp < paths)) {
+		/* awww, not enough space, is there */
+		off_t ppoff = paths + pathz - pp;
+
+		pathz = ((pathz + pz + 1U) / 256U + 1) * 256U;
+		paths = realloc(paths, pathz);
+		/* recalc paths pointer */
+		pp = paths + ppoff;
+	}
+
+	/* actually prepend now */
+	memcpy(pp, p, pz);
+	pp[pz] = ':';
+	setenv("PATH", pp, 1);
 	return;
 }
 
@@ -839,9 +874,10 @@ main(int argc, char *argv[])
 		rc = 99;
 	}
 
+	/* resource freeing */
+	free_path();
 out:
 	cmdline_parser_free(argi);
-	/* never succeed */
 	return rc;
 }
 
