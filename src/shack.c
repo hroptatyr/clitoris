@@ -365,11 +365,13 @@ nibble:
 		return false;
 	}
 	/* nibble check now, this is endian-dependant */
-	with (uint32_t tc = be32toh(tst.v[i]), rc = be32toh(ref.v[i])) {
-		/* we expect 0s in the lower nibbles of tc */
-		for (; tc && !(tc & 0x0fU); tc >>= 4U, rc >>= 4U);
-		/* now the rest needs to coincide */
-		if (rc != tc) {
+	with (uint32_t rc = be32toh(ref.v[i]), tc = be32toh(tst.v[i]) ^ rc) {
+		/* we swapped prefix and suffix through ^
+		 * and now we expect 0s in the higher nibbles of tc */
+		for (; rc && !((tc ^ rc) & 0x0fU); tc >>= 4U, rc >>= 4U);
+		/* now the rest needs to coincide,
+		 * i.e. tc must not have any bits set */
+		if (tc) {
 			return false;
 		}
 	}
