@@ -197,8 +197,10 @@ bufexp(const char src[static 1], size_t ssz)
 
 	switch (wordexp(buf, xp, WRDE_UNDEF)) {
 	case 0:
-		/* everything's fine */
-		break;
+		if (xp->we_wordc > 0) {
+			/* everything's fine */
+			break;
+		}
 	case WRDE_NOSPACE:
 		wordfree(xp);
 	default:
