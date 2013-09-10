@@ -1,0 +1,6 @@
+#!/usr/bin/clitoris  ## -*- shell-script -*-
+
+$ shack "${srcdir}/empty_01.clit" 01234567
+e4fcd7418127f6de12e13bb5e1afa9f271c41d78
+$ shack "${srcdir}/empty_01.clit" 0123 0123 e4fcd7
+$

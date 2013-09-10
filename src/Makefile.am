@@ -32,6 +32,10 @@ clitoris_LDADD = libclit.a
 clitoris_LDADD += -lutil
 BUILT_SOURCES += clitoris.x clitoris.h
 
+bin_PROGRAMS += shack
+shack_LDADD = libclit.a
+BUILT_SOURCES += shack.x shack.h
+
 
 ## generate version.c from .c.in
 version.c: version.c.in $(top_builddir)/version.mk
