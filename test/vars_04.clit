@@ -1,0 +1,8 @@
+#!/usr/bin/clitoris  ## -*- shell-script -*-
+
+$ export foo="bar"
+$ echo $foo
+bar
+$
+
+## vars_04.clit ends here

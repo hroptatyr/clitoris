@@ -1,0 +1,8 @@
+#!/usr/bin/clitoris  ## -*- shell-script -*-
+
+## testing diffing against reference files, specified in sh syntax
+$ cat "${srcdir}/empty_01.clit"
+< "${srcdir}/empty_01.clit"
+$
+
+## diff_04.clit ends here

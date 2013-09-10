@@ -26,6 +26,8 @@ TESTS += empty_03.clit
 
 TESTS += diff_01.clit
 XFAIL_TESTS += diff_02.clit
+TESTS += diff_03.clit
+TESTS += diff_04.clit
 
 XFAIL_TESTS += early_01.clit
 XFAIL_TESTS += early_02.clit
@@ -39,6 +41,15 @@ XFAIL_TESTS += tty_03.clit
 TESTS += out-in-file_01.clit
 TESTS += out-in-file_02.clit
 out-in-file_02.log: out-in-file_01.log
+
+TESTS += redir_01.clit
+TESTS += redir_02.clit
+TESTS += redir_03.clit
+
+TESTS += vars_01.clit
+TESTS += vars_02.clit
+#TESTS += vars_03.clit
+#TESTS += vars_04.clit
 
 CLIT_LOG_COMPILER += --timeout 2
 TESTS += timeo_01.clit
