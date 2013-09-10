@@ -26,6 +26,8 @@ TESTS += empty_03.clit
 
 TESTS += diff_01.clit
 XFAIL_TESTS += diff_02.clit
+TESTS += diff_03.clit
+TESTS += diff_04.clit
 
 XFAIL_TESTS += early_01.clit
 XFAIL_TESTS += early_02.clit

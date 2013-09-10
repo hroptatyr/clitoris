@@ -1,0 +1,21 @@
+#!/usr/bin/clitoris  ## -*- shell-script -*-
+
+## testing diffing against reference files
+$ cat <<EOF > foo
+foo
+bar
+baz
+bar
+baz
+EOF
+foo
+bar
+bar
+bar
+baz
+xtra
+$ cat foo
+< foo
+$
+
+## diff_03.clit ends here
