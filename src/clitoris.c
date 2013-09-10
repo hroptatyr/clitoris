@@ -51,6 +51,8 @@
 #include <string.h>
 #include <errno.h>
 #include <pty.h>
+/* check for me */
+#include <wordexp.h>
 
 #if !defined LIKELY
 # define LIKELY(_x)	__builtin_expect((_x), 1)
@@ -169,6 +171,50 @@ static inline clit_bit_t
 clit_make_fn(const char *fn)
 {
 	return (clit_bit_t){.z = -1UL, .fn = fn};
+}
+
+static const char*
+bufexp(const char src[static 1], size_t ssz)
+{
+	static char *buf;
+	static size_t bsz;
+	wordexp_t xp[1];
+
+	if (UNLIKELY(ssz == 0)) {
+		return NULL;
+	}
+
+#define CHKBSZ(x)				\
+	if ((x) > bsz) {			\
+		bsz = ((x) / 256U + 1U) * 256U;	\
+		buf = realloc(buf, bsz);	\
+	}
+
+	/* get our own copy for deep vein massages */
+	CHKBSZ(ssz);
+	memcpy(buf, src, ssz);
+	buf[ssz] = '\0';
+
+	switch (wordexp(buf, xp, WRDE_UNDEF)) {
+	case 0:
+		/* everything's fine */
+		break;
+	case WRDE_NOSPACE:
+		wordfree(xp);
+	default:
+		return NULL;
+	}
+
+	/* copy the first `argument', back into BUF,
+	 * which is hopefully big enough */
+	with (size_t wz = strlen(xp->we_wordv[0])) {
+		CHKBSZ(wz);
+		memcpy(buf, xp->we_wordv[0], wz);
+		buf[wz] = '\0';
+	}
+
+	wordfree(xp);
+	return buf;
 }
 
 
@@ -320,16 +366,15 @@ find_tst(struct clit_tst_s tst[static 1], const char *bp, size_t bz)
 	with (size_t outz = tst->rest.d - bp) {
 		if (outz &&
 		    /* prefixed '< '? */
-		    UNLIKELY(bp[0] == '<' && bp[1] == ' ') &&
-		    /* not too long */
-		    outz < 256U &&
-		    /* only one line? */
-		    memchr(bp + 2, '\n', outz - 2U - 1U) == NULL) {
+		    UNLIKELY(bp[0] == '<' && bp[1] == ' ')) {
 			/* it's a < FILE comparison */
-			static char fn[256U];
+			const char *fn;
 
-			memcpy(fn, bp + 2, outz - 2U - 1U);
-			tst->out = clit_make_fn(fn);
+			if ((fn = bufexp(bp + 2, outz - 2U - 1U)) != NULL) {
+				tst->out = clit_make_fn(fn);
+			} else {
+				tst->out = (clit_bit_t){0U};
+			}
 		} else {
 			tst->out = (clit_bit_t){.z = outz, bp};
 		}
