@@ -75,6 +75,8 @@ typedef struct {
 	uint32_t v[5U];
 } sha_t;
 
+static const sha_t null_sha = {};
+
 
 static void
 __attribute__((format(printf, 2, 3)))
@@ -199,7 +201,6 @@ sha_fin(const uint32_t b32[static 1], sha_t old, size_t fz/*in bytes*/)
 static sha_t
 shaf(const char *fn)
 {
-	static const sha_t null_sha = {};
 	struct stat st;
 	int fd;
 	size_t fz;
@@ -273,6 +274,76 @@ clo:
 	return null_sha;
 }
 
+static void
+sha_to_str(char buf[static restrict 2U * sizeof(sha_t)], sha_t s)
+{
+	char *restrict bp = buf;
+
+	for (const uint8_t *sp = (const void*)s.v,
+		     *const ep = sp + sizeof(s); sp < ep; sp++) {
+		static char hx[] = "0123456789abcdef";
+		*bp++ = hx[(*sp & 0xf0U) >> 4U];
+		*bp++ = hx[(*sp & 0x0fU) >> 0U];
+	}
+	return;
+}
+
+static sha_t
+str_to_sha(const char *s)
+{
+	sha_t res;
+
+#define unhx(c)					\
+	({					\
+		if (c < '0') {			\
+			goto err;		\
+		} else if (c <= '9') {		\
+			c -= '0';		\
+		} else if (c < 'A') {		\
+			goto err;		\
+		} else if (c <= 'F') {		\
+			c -= 'A' - 10;		\
+		} else if (c < 'a') {		\
+			goto err;		\
+		} else if (c <= 'f') {		\
+			c -= 'a' - 10;		\
+		} else {			\
+			goto err;		\
+		}				\
+		(uint8_t)c;			\
+	})
+
+	for (uint8_t *rp = (void*)res.v,
+		     *const ep = rp + sizeof(res); rp < ep; rp++) {
+		char c0;
+		char c1;
+
+		if (!(c0 = *s++) || !(c1 = *s++)) {
+			goto err;
+		}
+		/* otherwise all's fine */
+		*rp = unhx(c0);
+		*rp <<= 4U;
+		*rp |= unhx(c1);
+	}
+	return res;
+err:
+	return null_sha;
+}
+
+static bool
+sha_eqp(sha_t s1, sha_t s2)
+{
+	if (s1.v[0U] != s2.v[0U] ||
+	    s1.v[1U] != s2.v[1U] ||
+	    s1.v[2U] != s2.v[2U] ||
+	    s1.v[3U] != s2.v[3U] ||
+	    s1.v[4U] != s2.v[4U]) {
+		return false;
+	}
+	return true;
+}
+
 
 #if defined __INTEL_COMPILER
 # pragma warning (disable:593)
@@ -300,16 +371,28 @@ main(int argc, char *argv[])
 
 	with (const char *fn = argi->inputs[0U]) {
 		/* compute the sha of FN */
-		sha_t sum = shaf(fn);
+		sha_t ref = shaf(fn);
 
-		/* hex it */
-		for (const uint8_t *sp = (const void*)sum.v,
-			     *const ep = sp + sizeof(sum); sp < ep; sp++) {
-			static char hx[] = "0123456789abcdef";
-			putchar(hx[(*sp & 0xf0U) >> 4U]);
-			putchar(hx[(*sp & 0x0fU) >> 0U]);
+		/* default for now is ret code 1 */
+		rc = 1;
+		for (unsigned int i = 1; i < argi->inputs_num; i++) {
+			const char *arg = argi->inputs[i];
+			sha_t x = str_to_sha(arg);
+
+			if (sha_eqp(ref, x)) {
+				/* all's good */
+				rc = 0;
+				break;
+			}
 		}
-		putchar('\n');
+
+		if (UNLIKELY(rc > 0)) {
+			char buf[42U];
+
+			sha_to_str(buf, ref);
+			buf[40U] = '\0';
+			puts(buf);
+		}
 	}
 
 out:
