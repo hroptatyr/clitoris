@@ -319,7 +319,14 @@ str_to_sha(const char *s)
 		char c1;
 
 		if (!(c0 = *s++) || !(c1 = *s++)) {
-			goto err;
+			/* wipe the rest */
+			memset(rp, 0, ep - rp);
+			if (c0) {
+				/* put the upper nibble back in */
+				*rp = unhx(c0);
+				*rp <<= 4U;
+			}
+			break;
 		}
 		/* otherwise all's fine */
 		*rp = unhx(c0);
@@ -332,16 +339,49 @@ err:
 }
 
 static bool
-sha_eqp(sha_t s1, sha_t s2)
+sha_eqp(sha_t ref, sha_t tst)
 {
-	if (s1.v[0U] != s2.v[0U] ||
-	    s1.v[1U] != s2.v[1U] ||
-	    s1.v[2U] != s2.v[2U] ||
-	    s1.v[3U] != s2.v[3U] ||
-	    s1.v[4U] != s2.v[4U]) {
+/* check for equality, REF must be a full sha object, TST may be
+ * padded with 0s in which case only the prefix bits are checked */
+	size_t i;
+
+	for (i = 0U; i < 5U; i++) {
+		if (ref.v[i] != tst.v[i]) {
+			goto nibble;
+		}
+	}
+	/* definitely equal */
+	return true;
+nibble:
+	if (UNLIKELY(i == 0U && tst.v[i] == 0U)) {
+		/* null sha? best not risk it */
 		return false;
 	}
+	/* perform a nibble check on position I
+	 * first go through some invariants to rule out false positives */
+	if ((ref.v[i] & tst.v[i]) != tst.v[i] ||
+	    (ref.v[i] | tst.v[i]) != ref.v[i]) {
+		/* definitely not a prefix */
+		return false;
+	}
+	/* nibble check now, this is endian-dependant */
+	with (uint32_t tc = be32toh(tst.v[i]), rc = be32toh(ref.v[i])) {
+		/* we expect 0s in the lower nibbles of tc */
+		for (; tc && !(tc & 0x0fU); tc >>= 4U, rc >>= 4U);
+		/* now the rest needs to coincide */
+		if (rc != tc) {
+			return false;
+		}
+	}
+	/* and check if the rest of the bitseq in TST is 0 */
+	for (size_t j = i + 1U; j < 5U; j++) {
+		if (tst.v[j]) {
+			/* suffix was != 0 */
+			return false;
+		}
+	}
 	return true;
+
 }
 
 
