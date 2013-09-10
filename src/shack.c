@@ -48,7 +48,21 @@
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <errno.h>
-#include "boobs.h"
+
+/* *bsd except for openbsd */
+#if defined HAVE_SYS_ENDIAN_H
+# include <sys/endian.h>
+#elif defined HAVE_MACHINE_ENDIAN_H
+# include <machine/endian.h>
+#elif defined HAVE_ENDIAN_H
+# include <endian.h>
+#elif defined HAVE_BYTEORDER_H
+# include <byteorder.h>
+#endif	/* SYS/ENDIAN_H || MACHINE/ENDIAN_H || ENDIAN_H || BYTEORDER_H */
+/* check for byteswap to do the swapping ourselves if need be */
+#if defined HAVE_BYTESWAP_H
+# include <byteswap.h>
+#endif	/* BYTESWAP_H */
 
 #if !defined LIKELY
 # define LIKELY(_x)	__builtin_expect((_x), 1)
@@ -76,6 +90,117 @@ typedef struct {
 } sha_t;
 
 static const sha_t null_sha = {};
+
+
+/* boobs.h macros */
+/* just to abstract over pure swapping */
+#if defined htooe32
+/* yay, nothing to do really */
+#elif defined __GNUC__ && __GNUC__ == 4 && __GNUC_MINOR__ >= 7
+# define htooe32(x)	((uint32_t)__builtin_bswap32((uint32_t)x))
+#elif defined __bswap_32
+# define htooe32(x)	((uint32_t)__bswap_32((uint32_t)x))
+#elif defined __swap32
+# define htooe32(x)	((uint32_t)__swap32((uint32_t)x))
+#elif defined WORDS_BIGENDIAN && defined le32toh
+# define htooe32(x)	((uint32_t)le32toh((uint32_t)x))
+#elif !defined WORDS_BIGENDIAN && defined be32toh
+# define htooe32(x)	((uint32_t)be32toh((uint32_t)x))
+#else
+# warning htooe32() will not convert anything
+# define htooe32(x)	((uint32_t)x)
+#endif
+
+/* and even now we may be out of luck */
+#if !defined be32toh
+# if defined betoh32
+#  define be32toh(x)	((uint32_t)betoh32((uint32_t)x))
+# elif defined WORDS_BIGENDIAN
+#  define be32toh(x)	((uint32_t)x)
+# else	/* need some swaps */
+#  define be32toh(x)	((uint32_t)htooe32((uint32_t)x))
+# endif
+#endif	/* !be32toh */
+
+#if !defined le32toh
+# if defined letoh32
+#  define le32toh(x)	((uint32_t)letoh32((uint32_t)x))
+# elif defined WORDS_BIGENDIAN
+#  define le32toh(x)	((uint32_t)htooe32((uint32_t)x))
+# else	/* no byte swapping here */
+#  define le32toh(x)	((uint32_t)x)
+# endif	 /* letoh32 */
+#endif	/* !le32toh */
+
+#if !defined htobe32
+# if defined WORDS_BIGENDIAN
+#  define htobe32(x)	((uint32_t)x)
+# else	/* yep, swap me about */
+#  define htobe32(x)	((uint32_t)htooe32((uint32_t)x))
+# endif
+#endif	/* !be32toh */
+
+#if !defined htole32
+# if defined WORDS_BIGENDIAN
+#  define htole32(x)	((uint32_t)htooe32((uint32_t)x))
+# else	/* nothing to swap */
+#  define htole32(x)	((uint32_t)x)
+# endif
+#endif	/* !htole32 */
+
+
+#if defined htooe64
+/* yay, nothing to do really */
+#elif defined __GNUC__ && __GNUC__ == 4 && __GNUC_MINOR__ >= 7
+# define htooe64(x)	((uint64_t)__builtin_bswap64((uint64_t)x))
+#elif defined __bswap_64
+# define htooe64(x)	((uint64_t)__bswap_64((uint64_t)x))
+#elif defined __swap64
+# define htooe64(x)	((uint64_t)__swap64((uint64_t)x))
+#elif defined WORDS_BIGENDIAN && defined le64toh
+# define htooe64(x)	((uint64_t)le64toh((uint64_t)x))
+#elif !defined WORDS_BIGENDIAN && defined be64toh
+# define htooe64(x)	((uint64_t)be64toh((uint64_t)x))
+#else
+# warning htooe64() will not convert anything
+# define htooe64(x)	((uint64_t)x)
+#endif
+
+#if !defined be64toh
+# if defined betoh64
+#  define be64toh(x)	((uint64_t)betoh64((uint64_t)x))
+# elif defined WORDS_BIGENDIAN
+#  define be64toh(x)	((uint64_t)x)
+# else	/* swapping */
+#  define be64toh(x)	((uint64_t)htooe64((uint64_t)x))
+# endif
+#endif	/* !be64toh */
+
+#if !defined le64toh
+# if defined letoh64
+#  define le64toh(x)	((uint64_t)letoh64((uint64_t)x))
+# elif defined WORDS_BIGENDIAN
+#  define le64toh(x)	((uint64_t)htooe64((uint64_t)x))
+# else	/* nothing to swap */
+#  define le64toh(x)	((uint64_t)x)
+# endif
+#endif	/* !le64toh */
+
+#if !defined htobe64
+# if defined WORDS_BIGENDIAN
+#  define htobe64(x)	((uint64_t)x)
+# else
+#  define htobe64(x)	((uint64_t)htooe64((uint64_t)x))
+# endif
+#endif	/* !htobe64 */
+
+#if !defined htole64
+# if defined WORDS_BIGENDIAN
+#  define htole64(x)	((uint64_t)htooe64((uint64_t)x))
+# else	/* no need swapping */
+#  define htole64(x)	((uint64_t)x)
+# endif
+#endif	/* !htole64 */
 
 
 static void

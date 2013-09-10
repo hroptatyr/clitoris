@@ -33,8 +33,6 @@ clitoris_LDADD += -lutil
 BUILT_SOURCES += clitoris.x clitoris.h
 
 bin_PROGRAMS += shack
-shack_SOURCES = shack.c
-shack_SOURCES += boobs.h
 shack_LDADD = libclit.a
 BUILT_SOURCES += shack.x shack.h
 
