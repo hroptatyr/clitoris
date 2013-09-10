@@ -40,6 +40,10 @@ TESTS += out-in-file_01.clit
 TESTS += out-in-file_02.clit
 out-in-file_02.log: out-in-file_01.log
 
+TESTS += redir_01.clit
+TESTS += redir_02.clit
+TESTS += redir_03.clit
+
 CLIT_LOG_COMPILER += --timeout 2
 TESTS += timeo_01.clit
 XFAIL_TESTS += timeo_02.clit

@@ -1,0 +1,9 @@
+#!/usr/bin/clitoris  ## -*- shell-script -*-
+
+$ cat "${srcdir}/empty_01.clit" | cat
+#!/usr/bin/clitoris  ## -*- shell-script -*-
+
+## empty_01.clit
+$
+
+## redir_03.clit ends here

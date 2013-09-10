@@ -1,0 +1,9 @@
+#!/usr/bin/clitoris  ## -*- shell-script -*-
+
+$ cat <<EOF | cat
+bar
+EOF
+bar
+$
+
+## redir_02.clit ends here
