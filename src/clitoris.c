@@ -669,6 +669,58 @@ set_timeout(unsigned int tdiff)
 	return;
 }
 
+static void
+prepend_path(const char *p)
+{
+#define free_path()	prepend_path(NULL);
+	static char *paths;
+	static size_t pathz;
+	static char *pp;
+	size_t pz;
+
+	if (UNLIKELY(p == NULL)) {
+		/* freeing */
+		if (paths == NULL) {
+			free(paths);
+			paths = pp = NULL;
+		}
+		return;
+	}
+	/* otherwise it'd be safe to compute the strlen() methinks */
+	pz = strlen(p);
+
+	if (UNLIKELY(paths == NULL)) {
+		char *envp = getenv("PATH");
+		size_t envz = strlen(envp);
+
+		/* get us a nice big cushion */
+		pathz = ((envz + pz + 1U) / 256U + 1) * 256U;
+		paths = malloc(pathz);
+		/* glue the current path at the end of the array */
+		pp = (paths + pathz) - (envz + 1U);
+		memcpy(pp, envp, envz + 1U);
+	}
+
+	/* calc prepension pointer */
+	pp -= pz + 1U/*:*/;
+
+	if (UNLIKELY(pp < paths)) {
+		/* awww, not enough space, is there */
+		off_t ppoff = paths + pathz - pp;
+
+		pathz = ((pathz + pz + 1U) / 256U + 1) * 256U;
+		paths = realloc(paths, pathz);
+		/* recalc paths pointer */
+		pp = paths + ppoff;
+	}
+
+	/* actually prepend now */
+	memcpy(pp, p, pz);
+	pp[pz] = ':';
+	setenv("PATH", pp, 1);
+	return;
+}
+
 
 static int verbosep;
 static int ptyp;
@@ -795,22 +847,22 @@ main(int argc, char *argv[])
 		timeo = argi->timeout_arg;
 	}
 
-	/* also bang builddir to path */
-	with (char *blddir = getenv("builddir")) {
-		if (blddir != NULL) {
-			size_t blddiz = strlen(blddir);
-			char *path = getenv("PATH");
-			size_t patz = strlen(path);
-			char *newp;
-
-			newp = malloc(patz + blddiz + 1U/*:*/ + 1U/*\nul*/);
-			memcpy(newp, blddir, blddiz);
-			newp[blddiz] = ':';
-			memcpy(newp + blddiz + 1U, path, patz + 1U);
-			setenv("PATH", newp, 1);
-			free(newp);
+	/* prepend our current directory and our argv[0] directory */
+	with (char *arg0 = argv[0]) {
+		char *dir0;
+		if ((dir0 = strrchr(arg0, '/')) != NULL) {
+			*dir0 = '\0';
+			prepend_path(arg0);
 		}
 	}
+	prepend_path(".");
+	/* also bang builddir to path */
+	with (char *blddir = getenv("builddir")) {
+		if (LIKELY(blddir != NULL)) {
+			prepend_path(blddir);
+		}
+	}
+
 	/* just to be clear about this */
 #if defined WORDS_BIGENDIAN
 	setenv("endian", "big", 1);
@@ -822,9 +874,10 @@ main(int argc, char *argv[])
 		rc = 99;
 	}
 
+	/* resource freeing */
+	free_path();
 out:
 	cmdline_parser_free(argi);
-	/* never succeed */
 	return rc;
 }
 
