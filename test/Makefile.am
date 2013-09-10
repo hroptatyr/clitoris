@@ -44,6 +44,11 @@ TESTS += redir_01.clit
 TESTS += redir_02.clit
 TESTS += redir_03.clit
 
+TESTS += vars_01.clit
+TESTS += vars_02.clit
+TESTS += vars_03.clit
+TESTS += vars_04.clit
+
 CLIT_LOG_COMPILER += --timeout 2
 TESTS += timeo_01.clit
 XFAIL_TESTS += timeo_02.clit

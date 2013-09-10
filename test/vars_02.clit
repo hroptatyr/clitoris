@@ -1,0 +1,7 @@
+#!/usr/bin/clitoris  ## -*- shell-script -*-
+
+$ foo="bar"; echo $foo
+bar
+$
+
+## vars_02.clit ends here
