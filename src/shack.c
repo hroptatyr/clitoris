@@ -175,11 +175,19 @@ sha_fin(const uint32_t b32[static 1], sha_t old, size_t fz/*in bytes*/)
 	uint32_t l[16U];
 	size_t fz512 = fz % 64U;
 
-	/* copy the first chunk */
+	/* copy the beef, we use the fact that mmap() transparently
+	 * gives us 0-bytes after the end of the map */
 	memcpy(l, b32, sizeof(l));
 	with (uint8_t *restrict l8 = (void*)l) {
 		/* append sep char 0x80 */
 		l8[fz512] = 0x80U;
+	}
+	/* check if there's room for the filesize indicator */
+	if (UNLIKELY(fz512 >= 56U)) {
+		/* send him off first */
+		old = sha_chunk(l, old);
+		/* wipe the buffer again */
+		memset(l, 0, sizeof(l));
 	}
 	/* last 2 l entries are big-endian fz */
 	with (uint64_t *restrict l64 = (void*)l) {
