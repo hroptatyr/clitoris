@@ -669,6 +669,23 @@ set_timeout(unsigned int tdiff)
 	return;
 }
 
+static void
+prepend_path(const char *p)
+{
+	size_t pz = strlen(p);
+	char *path = getenv("PATH");
+	size_t patz = strlen(path);
+	char *newp;
+
+	newp = malloc(patz + pz + 1U/*:*/ + 1U/*\nul*/);
+	memcpy(newp, p, pz);
+	newp[pz] = ':';
+	memcpy(newp + pz + 1U, path, patz + 1U);
+	setenv("PATH", newp, 1);
+	free(newp);
+	return;
+}
+
 
 static int verbosep;
 static int ptyp;
@@ -797,20 +814,11 @@ main(int argc, char *argv[])
 
 	/* also bang builddir to path */
 	with (char *blddir = getenv("builddir")) {
-		if (blddir != NULL) {
-			size_t blddiz = strlen(blddir);
-			char *path = getenv("PATH");
-			size_t patz = strlen(path);
-			char *newp;
-
-			newp = malloc(patz + blddiz + 1U/*:*/ + 1U/*\nul*/);
-			memcpy(newp, blddir, blddiz);
-			newp[blddiz] = ':';
-			memcpy(newp + blddiz + 1U, path, patz + 1U);
-			setenv("PATH", newp, 1);
-			free(newp);
+		if (LIKELY(blddir != NULL)) {
+			prepend_path(blddir);
 		}
 	}
+
 	/* just to be clear about this */
 #if defined WORDS_BIGENDIAN
 	setenv("endian", "big", 1);
