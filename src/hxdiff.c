@@ -338,7 +338,9 @@ hexlify(const char *src, size_t ssz, off_t off)
 		bp += hexlify_line(bp, sp, 16U, off);
 	}
 	/* last one is special */
-	bp += hexlify_line(bp, sp, ssz % 16U, off);
+	if (ssz % 16U) {
+		bp += hexlify_line(bp, sp, ssz % 16U, off);
+	}
 	return (clit_buf_t){.z = bp - buf, .d = buf};
 }
 
