@@ -184,13 +184,9 @@ init_diff(struct clit_chld_s ctx[static 1])
 		unblock_sigs();
 
 		close(STDIN_FILENO);
-		close(STDOUT_FILENO);
 		/* kick the write ends of our pipes */
 		close(p_exp[1]);
 		close(p_is[1]);
-
-		/* stdout -> stderr */
-		dup2(STDERR_FILENO, STDOUT_FILENO);
 
 		snprintf(fa, sizeof(fa), "/dev/fd/%d", *p_exp);
 		snprintf(fb, sizeof(fb), "/dev/fd/%d", *p_is);
