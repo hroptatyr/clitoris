@@ -411,8 +411,6 @@ hxdiff(const char *file1, const char *file2)
 					close(ctx->fd_df2);
 				}
 			}
-
-			printf("%zu/%zu  %zu/%zu\n", tot1, fz1, tot2, fz2);
 		} while (tot1 < fz1 || tot2 < fz2);
 	}
 
