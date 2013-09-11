@@ -830,6 +830,7 @@ test(const char *testfile)
 
 	if ((fd = open(testfile, O_RDONLY)) < 0) {
 		error(0, "Error: cannot open file `%s'", testfile);
+		goto out;
 	} else if (fstat(fd, &st) < 0) {
 		error(0, "Error: cannot stat file `%s'", testfile);
 		goto clo;
@@ -844,6 +845,7 @@ test(const char *testfile)
 	munmap_fd(tf);
 clo:
 	close(fd);
+out:
 	return rc;
 }
 
