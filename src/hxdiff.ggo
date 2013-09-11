@@ -1,0 +1,5 @@
+args "--unamed-opts --long-help --no-handle-error"
+package "hxdiff"
+usage "hxdiff [OPTION]... FILE1 FILE2"
+description "Diff the hexdump of FILE1 and FILE2."
+

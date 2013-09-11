@@ -36,6 +36,10 @@ bin_PROGRAMS += shack
 shack_LDADD = libclit.a
 BUILT_SOURCES += shack.x shack.h
 
+bin_PROGRAMS += hxdiff
+hxdiff_LDADD = libclit.a
+BUILT_SOURCES += hxdiff.x hxdiff.h
+
 
 ## generate version.c from .c.in
 version.c: version.c.in $(top_builddir)/version.mk
