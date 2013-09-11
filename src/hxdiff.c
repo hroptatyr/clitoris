@@ -47,7 +47,6 @@
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
-#include <sys/epoll.h>
 #include <string.h>
 #include <errno.h>
 /* check for me */
@@ -63,6 +62,10 @@
 #if !defined countof
 # define countof(x)	(sizeof(x) / sizeof(*x))
 #endif	/* !countof */
+
+#if !defined UNUSED
+# define UNUSED(x)	__attribute__((unused)) x
+#endif	/* !UNUSED */
 
 #if !defined with
 # define with(args...)	for (args, *__ep__ = (void*)1; __ep__; __ep__ = 0)
@@ -85,7 +88,6 @@ struct clit_buf_s {
 struct clit_chld_s {
 	int fd_df1;
 	int fd_df2;
-	int pll;
 	pid_t chld;
 
 	unsigned int verbosep:1;
@@ -129,10 +131,8 @@ unblock_sigs(void)
 
 
 static int
-init_chld(struct clit_chld_s ctx[static 1])
+init_chld(struct clit_chld_s UNUSED(ctx)[static 1])
 {
-	ctx->pll = epoll_create1(EPOLL_CLOEXEC);
-
 	/* set up the set of fatal signals */
 	sigemptyset(fatal_signal_set);
 	sigaddset(fatal_signal_set, SIGHUP);
@@ -147,24 +147,9 @@ init_chld(struct clit_chld_s ctx[static 1])
 }
 
 static int
-fini_chld(struct clit_chld_s ctx[static 1])
+fini_chld(struct clit_chld_s UNUSED(ctx)[static 1])
 {
-	int st;
-	int rc;
-
-	unblock_sigs();
-
-	while (waitpid(ctx->chld, &st, 0) != ctx->chld);
-	if (LIKELY(WIFEXITED(st))) {
-		rc = WEXITSTATUS(st);
-	} else {
-		rc = 1;
-	}
-
-	/* end of epoll monitoring */
-	close(ctx->pll);
-
-	return rc;
+	return 0;
 }
 
 static int
@@ -239,6 +224,23 @@ clo_exp:
 	close(p_exp[0]);
 	close(p_exp[1]);
 	return -1;
+}
+
+static int
+fini_diff(struct clit_chld_s ctx[static 1])
+{
+	int st;
+	int rc;
+
+	unblock_sigs();
+
+	while (waitpid(ctx->chld, &st, 0) != ctx->chld);
+	if (LIKELY(WIFEXITED(st))) {
+		rc = WEXITSTATUS(st);
+	} else {
+		rc = 1;
+	}
+	return rc;
 }
 
 static size_t
@@ -417,7 +419,11 @@ hxdiff(const char *file1, const char *file2)
 	}
 
 	/* get the diff tool's exit status et al */
-	rc = fini_chld(ctx);
+	rc = fini_diff(ctx);
+
+	if (UNLIKELY(fini_chld(ctx) < 0)) {
+		rc = -1;
+	}
 
 clo:
 	close(fd1);
