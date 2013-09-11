@@ -126,17 +126,17 @@ static sigset_t empty_signal_set[1];
 
 
 static void
-__attribute__((format(printf, 2, 3)))
-error(int eno, const char *fmt, ...)
+__attribute__((format(printf, 1, 2)))
+error(const char *fmt, ...)
 {
 	va_list vap;
 	va_start(vap, fmt);
 	vfprintf(stderr, fmt, vap);
 	va_end(vap);
-	if (eno || errno) {
+	if (errno) {
 		fputc(':', stderr);
 		fputc(' ', stderr);
-		fputs(strerror(eno ?: errno), stderr);
+		fputs(strerror(errno), stderr);
 	}
 	fputc('\n', stderr);
 	return;
@@ -534,7 +534,7 @@ diff_bits(clit_bit_t exp, clit_bit_t is)
 		}
 
 		execvp("diff", diff_opt);
-		error(0, "execlp failed");
+		error("execlp failed");
 		_exit(EXIT_FAILURE);
 
 	default:;
@@ -623,7 +623,7 @@ init_tst(struct clit_chld_s ctx[static 1])
 		close(pou[0]);
 		close(pou[1]);
 		execl("/bin/sh", "sh", NULL);
-		error(0, "execl failed");
+		error("execl failed");
 		_exit(EXIT_FAILURE);
 
 	default:
@@ -829,12 +829,13 @@ test(const char *testfile)
 	int rc = -1;
 
 	if ((fd = open(testfile, O_RDONLY)) < 0) {
-		error(0, "Error: cannot open file `%s'", testfile);
+		error("Error: cannot open file `%s'", testfile);
+		goto out;
 	} else if (fstat(fd, &st) < 0) {
-		error(0, "Error: cannot stat file `%s'", testfile);
+		error("Error: cannot stat file `%s'", testfile);
 		goto clo;
 	} else if ((tf = mmap_fd(fd, st.st_size)).d == NULL) {
-		error(0, "Error: cannot map file `%s'", testfile);
+		error("Error: cannot map file `%s'", testfile);
 		goto clo;
 	}
 	/* yaay, perform the test */
@@ -844,6 +845,7 @@ test(const char *testfile)
 	munmap_fd(tf);
 clo:
 	close(fd);
+out:
 	return rc;
 }
 
