@@ -71,8 +71,8 @@
 
 #define xmin(a, b)				\
 	({					\
-		typeof(a) _a_ = a;		\
-		typeof(b) _b_ = b;		\
+		uintptr_t _a_ = a;		\
+		uintptr_t _b_ = b;		\
 		_a_ < _b_ ? _a_ : _b_;		\
 	})
 
