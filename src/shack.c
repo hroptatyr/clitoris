@@ -323,12 +323,13 @@ sha_fin(const uint32_t b32[static 1], sha_t old, size_t fz/*in bytes*/)
 	return sha_chunk(l, old);
 }
 
-static sha_t
-shaf(const char *fn)
+static int
+shaf(sha_t *tgt, const char *fn)
 {
 	struct stat st;
 	int fd;
 	size_t fz;
+	int rc = -1;
 	sha_t h = {
 		0x67452301U,
 		0xEFCDAB89U,
@@ -388,15 +389,15 @@ shaf(const char *fn)
 		}
 	}
 out:
+	/* success then? */
+	rc = 0;
 	/* convert to big endian */
 	for (size_t i = 0U; i < 5U; i++) {
-		h.v[i] = htobe32(h.v[i]);
+		tgt->v[i] = htobe32(h.v[i]);
 	}
-	close(fd);
-	return h;
 clo:
 	close(fd);
-	return null_sha;
+	return rc;
 }
 
 static void
@@ -538,7 +539,12 @@ main(int argc, char *argv[])
 
 	with (const char *fn = argi->inputs[0U]) {
 		/* compute the sha of FN */
-		sha_t ref = shaf(fn);
+		sha_t ref;
+
+		if (shaf(&ref, fn) < 0) {
+			/* oh great */
+			break;
+		}
 
 		/* default for now is ret code 1 */
 		rc = 1;
