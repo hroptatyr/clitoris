@@ -60,4 +60,7 @@ TESTS += timeo_04.clit
 TESTS += shack_01.clit
 XFAIL_TESTS += shack_02.clit
 
+TESTS += hxdiff_01.clit
+XFAIL_TESTS += hxdiff_02.clit
+
 ## Makefile.am ends here
