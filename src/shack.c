@@ -90,6 +90,7 @@ typedef struct {
 } sha_t;
 
 static const sha_t null_sha = {};
+static size_t pgsz;
 
 
 /* boobs.h macros */
@@ -352,22 +353,22 @@ shaf(sha_t *tgt, const char *fn)
 		goto out;
 	}
 	/* now map considerable portions of the file and process */
-	for (size_t i = 0; i < fz / 4096U; i++) {
-		off_t o = i * 4096U;
-		void *p = mmap(NULL, 4096U, PROT_READ, MAP_SHARED, fd, o);
+	for (size_t i = 0; i < fz / pgsz; i++) {
+		off_t o = i * pgsz;
+		void *p = mmap(NULL, pgsz, PROT_READ, MAP_SHARED, fd, o);
 
 		if (UNLIKELY(p == MAP_FAILED)) {
 			goto clo;
 		}
-		for (size_t j = 0; j < 4096U; j += 64U) {
+		for (size_t j = 0; j < pgsz; j += 64U) {
 			const void *b32 = (const uint8_t*)p + j;
 			h = sha_chunk(b32, h);
 		}
-		if (munmap(p, 4096U) < 0) {
+		if (munmap(p, pgsz) < 0) {
 			goto clo;
 		}
 	}
-	with (size_t rest = fz % 4096U) {
+	with (size_t rest = fz % pgsz) {
 		off_t o = fz - rest;
 		void *p = mmap(NULL, rest, PROT_READ, MAP_SHARED, fd, o);
 		size_t j;
@@ -537,6 +538,7 @@ main(int argc, char *argv[])
 		goto out;
 	}
 
+	pgsz = sysconf(_SC_PAGESIZE);
 	with (const char *fn = argi->inputs[0U]) {
 		/* compute the sha of FN */
 		sha_t ref;
