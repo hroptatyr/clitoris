@@ -1,0 +1,7 @@
+#!/usr/bin/clitoris ## -*- shell-script -*-
+
+$ ignore-return diff /dev/null /dev/zero
+Binary files /dev/null and /dev/zero differ
+$
+
+## ignore_06.clit ends here
