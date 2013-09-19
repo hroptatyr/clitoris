@@ -90,14 +90,8 @@ struct clit_buf_s {
  * A clit bit can be an ordinary memory buffer (z > 0 && d),
  * a file descriptor (fd != 0 && d == NULL), or a file name (z == -1UL && fn) */
 struct clit_bit_s {
-	union {
-		size_t z;
-		int fd;
-	};
-	union {
-		const char *d;
-		const char *fn;
-	};
+	size_t z;
+	const char *d;
 };
 
 struct clit_chld_s {
@@ -171,13 +165,13 @@ clit_bit_fn_p(clit_bit_t x)
 static inline clit_bit_t
 clit_make_fd(int fd)
 {
-	return (clit_bit_t){.fd = fd};
+	return (clit_bit_t){.z = fd};
 }
 
 static inline clit_bit_t
 clit_make_fn(const char *fn)
 {
-	return (clit_bit_t){.z = -1UL, .fn = fn};
+	return (clit_bit_t){.z = -1UL, .d = fn};
 }
 
 static const char*
@@ -502,7 +496,7 @@ pipe_bits(int p[static 2], clit_bit_t b)
 	if (clit_bit_buf_p(b) && UNLIKELY(pipe(p)) < 0) {
 		return -1;
 	} else if (clit_bit_fd_p(b)) {
-		p[0] = b.fd;
+		p[0] = (int)b.z;
 		p[1] = -1;
 	} else if (clit_bit_fn_p(b)) {
 		p[0] = -1;
@@ -553,12 +547,12 @@ diff_bits(clit_bit_t exp, clit_bit_t is)
 		if (!clit_bit_fn_p(exp)) {
 			snprintf(fa, sizeof(fa), "/dev/fd/%d", *pin_a);
 		} else {
-			snprintf(fa, sizeof(fa), "%s", exp.fn);
+			snprintf(fa, sizeof(fa), "%s", exp.d);
 		}
 		if (!clit_bit_fn_p(is)) {
 			snprintf(fb, sizeof(fb), "/dev/fd/%d", *pin_b);
 		} else {
-			snprintf(fb, sizeof(fb), "%s", is.fn);
+			snprintf(fb, sizeof(fb), "%s", is.d);
 		}
 
 		execvp("diff", diff_opt);
