@@ -49,6 +49,7 @@
 #include <sys/wait.h>
 #include <sys/epoll.h>
 #include <string.h>
+#include <ctype.h>
 #include <errno.h>
 #include <pty.h>
 /* check for me */
@@ -118,6 +119,12 @@ struct clit_tst_s {
 	clit_bit_t out;
 	clit_bit_t err;
 	clit_bit_t rest;
+
+	/* specific per-test flags */
+	/** don't fail when the actual output differs from th expected output */
+	unsigned int ign_out:1;
+	/** don't fail when the command returns non-SUCCESS */
+	unsigned int ign_ret:1;
 };
 
 
@@ -381,6 +388,27 @@ find_tst(struct clit_tst_s tst[static 1], const char *bp, size_t bz)
 			tst->out = (clit_bit_t){.z = outz, bp};
 		}
 	}
+
+	/* oh let's see if we should ignore things */
+	with (const char *cmd = tst->cmd.d, *const ec = cmd + tst->cmd.z) {
+		static char tok_ign[] = "ignore";
+
+		if (strncmp(cmd, tok_ign, sizeof(tok_ign) - 1U)) {
+			/* don't bother */
+			break;
+		} else if ((cmd += sizeof(tok_ign) - 1U, !isspace(*cmd))) {
+			/* unknown token then */
+			break;
+		}
+		/* otherwise it's our famous ignore token it seems */
+		tst->ign_out = tst->ign_ret = 1U;
+
+		/* fast-forward to the actual command, and reass */
+		while (++cmd < ec && isspace(*cmd));
+		tst->cmd.z -= (cmd - tst->cmd.d);
+		tst->cmd.d = cmd;
+	}
+
 	tst->err = (clit_bit_t){0U};
 	return 0;
 fail:
@@ -811,7 +839,12 @@ test_f(clitf_t tf)
 			if (ctx->verbosep) {
 				fprintf(stderr, "$? %d\n", rc);
 			}
-			break;
+			if (!tst->ign_ret) {
+				break;
+			} else {
+				/* smoothen rc if ignore is requested */
+				rc = 0;
+			}
 		}
 	}
 	if (UNLIKELY(fini_chld(ctx)) < 0) {
