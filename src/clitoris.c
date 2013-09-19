@@ -120,6 +120,9 @@ struct clit_tst_s {
 	unsigned int ign_out:1;
 	/** don't fail when the command returns non-SUCCESS */
 	unsigned int ign_ret:1;
+
+	/** expect this return code, or any but 0 if all bits are set */
+	unsigned int exp_ret:8;
 };
 
 
@@ -352,39 +355,8 @@ eof:
 }
 
 static int
-find_tst(struct clit_tst_s tst[static 1], const char *bp, size_t bz)
+find_ignore(struct clit_tst_s tst[static 1])
 {
-	if (UNLIKELY(!(tst->cmd = find_cmd(bp, bz)).z)) {
-		goto fail;
-	}
-	/* reset bp and bz */
-	bz = bz - (tst->cmd.d + tst->cmd.z - bp);
-	bp = tst->cmd.d + tst->cmd.z;
-	if (UNLIKELY((tst->rest.d = find_shtok(bp, bz)) == NULL)) {
-		goto fail;
-	}
-	/* otherwise set the rest bit already */
-	tst->rest.z = bz - (tst->rest.d - bp);
-
-	/* now the stdout bit must be in between (or 0) */
-	with (size_t outz = tst->rest.d - bp) {
-		if (outz &&
-		    /* prefixed '< '? */
-		    UNLIKELY(bp[0] == '<' && bp[1] == ' ')) {
-			/* it's a < FILE comparison */
-			const char *fn;
-
-			if ((fn = bufexp(bp + 2, outz - 2U - 1U)) != NULL) {
-				tst->out = clit_make_fn(fn);
-			} else {
-				tst->out = (clit_bit_t){0U};
-			}
-		} else {
-			tst->out = (clit_bit_t){.z = outz, bp};
-		}
-	}
-
-	/* oh let's see if we should ignore things */
 	with (const char *cmd = tst->cmd.d, *const ec = cmd + tst->cmd.z) {
 		static char tok_ign[] = "ignore";
 		static char tok_out[] = "output";
@@ -421,6 +393,79 @@ find_tst(struct clit_tst_s tst[static 1], const char *bp, size_t bz)
 		tst->cmd.z -= (cmd - tst->cmd.d);
 		tst->cmd.d = cmd;
 	}
+	return 0;
+}
+
+static int
+find_negexp(struct clit_tst_s tst[static 1])
+{
+	with (const char *cmd = tst->cmd.d, *const ec = cmd + tst->cmd.z) {
+		unsigned int exp = 0U;
+
+		switch (*cmd++) {
+		case '!'/*NEG*/:
+			exp = 255U;
+			break;
+		case '?'/*EXP*/:;
+			char *p;
+			exp = strtoul(cmd, &p, 10);
+			cmd = cmd + (p - cmd);
+			break;
+		default:
+			return 0;
+		}
+
+		if (!isspace(*cmd)) {
+			return 0;
+		}
+
+		/* now, fast-forward to the actual command, and reass */
+		while (++cmd < ec && isspace(*cmd));
+		tst->cmd.z -= (cmd - tst->cmd.d);
+		tst->cmd.d = cmd;
+		tst->exp_ret = exp;
+	}
+	return 0;
+}
+
+static int
+find_tst(struct clit_tst_s tst[static 1], const char *bp, size_t bz)
+{
+	if (UNLIKELY(!(tst->cmd = find_cmd(bp, bz)).z)) {
+		goto fail;
+	}
+	/* reset bp and bz */
+	bz = bz - (tst->cmd.d + tst->cmd.z - bp);
+	bp = tst->cmd.d + tst->cmd.z;
+	if (UNLIKELY((tst->rest.d = find_shtok(bp, bz)) == NULL)) {
+		goto fail;
+	}
+	/* otherwise set the rest bit already */
+	tst->rest.z = bz - (tst->rest.d - bp);
+
+	/* now the stdout bit must be in between (or 0) */
+	with (size_t outz = tst->rest.d - bp) {
+		if (outz &&
+		    /* prefixed '< '? */
+		    UNLIKELY(bp[0] == '<' && bp[1] == ' ')) {
+			/* it's a < FILE comparison */
+			const char *fn;
+
+			if ((fn = bufexp(bp + 2, outz - 2U - 1U)) != NULL) {
+				tst->out = clit_make_fn(fn);
+			} else {
+				tst->out = (clit_bit_t){0U};
+			}
+		} else {
+			tst->out = (clit_bit_t){.z = outz, bp};
+		}
+	}
+
+	/* oh let's see if we should ignore things */
+	find_ignore(tst);
+
+	/* check for expect and negate operators */
+	find_negexp(tst);
 
 	tst->err = (clit_bit_t){0U};
 	return 0;
@@ -726,7 +771,18 @@ run_tst(struct clit_chld_s ctx[static 1], struct clit_tst_s tst[static 1])
 
 	while (waitpid(ctx->chld, &st, 0) != ctx->chld);
 	if (LIKELY(WIFEXITED(st))) {
-		rc = rc ?: WEXITSTATUS(st);
+		int tst_rc = WEXITSTATUS(st);
+
+		if (tst->exp_ret == tst_rc) {
+			tst_rc = 0;
+		} else if (tst->exp_ret == 255U && tst_rc) {
+			tst_rc = 0;
+		} else {
+			tst_rc = 1;
+		}
+
+		/* now assign */
+		rc = rc ?: tst_rc;
 	} else {
 		rc = 1;
 	}
