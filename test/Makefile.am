@@ -73,4 +73,11 @@ TESTS += ignore_06.clit
 XFAIL_TESTS += keep-going_01.clit
 XFAIL_TESTS += keep-going_02.clit
 
+TESTS += negexp_01.clit
+XFAIL_TESTS += negexp_02.clit
+TESTS += negexp_03.clit
+TESTS += negexp_04.clit
+XFAIL_TESTS += negexp_05.clit
+XFAIL_TESTS += negexp_06.clit
+
 ## Makefile.am ends here
