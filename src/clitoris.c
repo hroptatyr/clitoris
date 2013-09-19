@@ -386,18 +386,36 @@ find_tst(struct clit_tst_s tst[static 1], const char *bp, size_t bz)
 	/* oh let's see if we should ignore things */
 	with (const char *cmd = tst->cmd.d, *const ec = cmd + tst->cmd.z) {
 		static char tok_ign[] = "ignore";
+		static char tok_out[] = "output";
+		static char tok_ret[] = "return";
 
 		if (strncmp(cmd, tok_ign, sizeof(tok_ign) - 1U)) {
 			/* don't bother */
 			break;
-		} else if ((cmd += sizeof(tok_ign) - 1U, !isspace(*cmd))) {
+		}
+		/* fast-forward a little */
+		cmd += sizeof(tok_ign) - 1U;
+
+		if (isspace(*cmd)) {
+			/* it's our famous ignore token it seems */
+			tst->ign_out = tst->ign_ret = 1U;
+		} else if (*cmd++ != '-') {
 			/* unknown token then */
 			break;
+		} else if (!strncmp(cmd, tok_out, sizeof(tok_out) - 1U)) {
+			/* ignore-output it is */
+			tst->ign_out = 1U;
+			cmd += sizeof(tok_out) - 1U;
+		} else if (!strncmp(cmd, tok_ret, sizeof(tok_ret) - 1U)) {
+			/* ignore-return it is */
+			tst->ign_ret = 1U;
+			cmd += sizeof(tok_ret) - 1U;
+		} else {
+			/* don't know what's going on */
+			break;
 		}
-		/* otherwise it's our famous ignore token it seems */
-		tst->ign_out = tst->ign_ret = 1U;
 
-		/* fast-forward to the actual command, and reass */
+		/* now, fast-forward to the actual command, and reass */
 		while (++cmd < ec && isspace(*cmd));
 		tst->cmd.z -= (cmd - tst->cmd.d);
 		tst->cmd.d = cmd;
@@ -699,12 +717,18 @@ run_tst(struct clit_chld_s ctx[static 1], struct clit_tst_s tst[static 1])
 	}
 
 	rc = diff_out(ctx, tst->out);
+	if (tst->ign_out) {
+		rc = 0;
+	}
 
 	while (waitpid(ctx->chld, &st, 0) != ctx->chld);
 	if (LIKELY(WIFEXITED(st))) {
 		rc = rc ?: WEXITSTATUS(st);
 	} else {
 		rc = 1;
+	}
+	if (tst->ign_ret) {
+		rc = 0;
 	}
 
 	if (UNLIKELY(ctx->ptyp)) {
@@ -829,16 +853,11 @@ test_f(clitf_t tf)
 			fputs("$ ", stderr);
 			fwrite(tst->cmd.d, sizeof(char), tst->cmd.z, stderr);
 		}
-		if ((rc = run_tst(ctx, tst))) {
+		with (int tst_rc = run_tst(ctx, tst)) {
 			if (ctx->verbosep) {
-				fprintf(stderr, "$? %d\n", rc);
+				fprintf(stderr, "$? %d\n", tst_rc);
 			}
-			if (!tst->ign_ret) {
-				break;
-			} else {
-				/* smoothen rc if ignore is requested */
-				rc = 0;
-			}
+			rc = rc ?: tst_rc;
 		}
 	}
 	if (UNLIKELY(fini_chld(ctx)) < 0) {
