@@ -1,0 +1,7 @@
+#!/usr/bin/clitoris  ## -*- shell-script -*-
+
+## the return code should be ignored
+$ ignore false
+$
+
+## ignore_02.clit ends here
