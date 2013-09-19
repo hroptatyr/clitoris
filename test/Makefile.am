@@ -65,5 +65,9 @@ XFAIL_TESTS += hxdiff_02.clit
 
 TESTS += ignore_01.clit
 TESTS += ignore_02.clit
+TESTS += ignore_03.clit
+TESTS += ignore_04.clit
+TESTS += ignore_05.clit
+TESTS += ignore_06.clit
 
 ## Makefile.am ends here

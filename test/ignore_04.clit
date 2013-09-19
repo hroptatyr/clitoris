@@ -1,0 +1,10 @@
+#!/usr/bin/clitoris ## -*- shell-script -*-
+
+$ ignore-output if test -n "${SHELL}"; then \
+	echo "${SHELL}"; \
+  else \
+	echo "shell unset"; \
+  fi
+$
+
+## ignore_04.clit ends here
