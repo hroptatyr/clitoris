@@ -1,0 +1,11 @@
+#!/usr/bin/clitoris ## -*- shell-script -*-
+
+unsetopt keep-going
+
+$ false
+$ echo "This line will never be exec'd"
+Wrong Output
+$ true
+$
+
+## keep_going_01.clit ends here

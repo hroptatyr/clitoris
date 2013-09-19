@@ -1,0 +1,11 @@
+#!/usr/bin/clitoris ## -*- shell-script -*-
+
+setopt keep-going
+
+$ false
+$ echo "Correct Output"
+Wrong Output
+$ true
+$
+
+## keep_going_02.clit ends here
