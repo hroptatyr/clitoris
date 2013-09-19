@@ -1,0 +1,7 @@
+#!/usr/bin/clitoris  ## -*- shell-script -*-
+
+## we expect success
+$ ?1 false
+$
+
+## negexp_04.clit ends here

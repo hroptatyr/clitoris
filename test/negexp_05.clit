@@ -1,0 +1,7 @@
+#!/usr/bin/clitoris  ## -*- shell-script -*-
+
+## should fail, false gives us 1
+$ ?2 false
+$
+
+## negexp_05.clit ends here
