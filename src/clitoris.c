@@ -103,6 +103,7 @@ struct clit_chld_s {
 
 	unsigned int verbosep:1;
 	unsigned int ptyp:1;
+	unsigned int keep_going_p:1;
 
 	unsigned int timeo;
 };
@@ -467,6 +468,8 @@ find_opt(struct clit_chld_s ctx[static 1], const char *bp, size_t bz)
 			if ((timeo = strtoul(arg, &p, 0), *p == '\n')) {
 				ctx->timeo = (unsigned int)timeo;
 			}
+		} else if (CMP(mp, "keep-going\n") == 0) {
+			ctx->keep_going_p = opt;
 		}
 #undef CMP
 	}
@@ -817,6 +820,7 @@ prepend_path(const char *p)
 
 static int verbosep;
 static int ptyp;
+static int keep_going_p;
 static unsigned int timeo;
 
 static int
@@ -839,6 +843,9 @@ test_f(clitf_t tf)
 	if (ptyp) {
 		ctx->ptyp = 1U;
 	}
+	if (keep_going_p) {
+		ctx->keep_going_p = 1U;
+	}
 	ctx->timeo = timeo;
 
 	/* find options in the test script */
@@ -858,6 +865,9 @@ test_f(clitf_t tf)
 				fprintf(stderr, "$? %d\n", tst_rc);
 			}
 			rc = rc ?: tst_rc;
+		}
+		if (rc && !ctx->keep_going_p) {
+			break;
 		}
 	}
 	if (UNLIKELY(fini_chld(ctx)) < 0) {
@@ -940,6 +950,9 @@ main(int argc, char *argv[])
 	}
 	if (argi->timeout_given) {
 		timeo = argi->timeout_arg;
+	}
+	if (argi->keep_going_given) {
+		keep_going_p = 1;
 	}
 
 	/* prepend our current directory and our argv[0] directory */

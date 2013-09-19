@@ -34,3 +34,7 @@ option "pseudo-tty" t
 option "timeout" -
 	"Time out after SECS seconds."
 	int typestr="SECS" optional
+
+option "keep-going" k
+	"Don't break on the first failure or differing output"
+	optional
