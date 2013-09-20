@@ -496,17 +496,19 @@ hxdiff(const char *file1, const char *file2)
 	} else if ((fd2 = open(file2, O_RDONLY)) < 0) {
 		error("Error: cannot open file `%s'", file2);
 		goto clo;
-	} else if (fstat(fd1, &st) < 0) {
+	}
+
+	if (fstat(fd1, &st) < 0) {
 		error("Error: cannot stat file `%s'", file1);
 		goto clo;
-	} else if ((fz1 = st.st_size, 0)) {
-		/* optimised out */
-	} else if (fstat(fd2, &st) < 0) {
+	}
+	fz1 = st.st_size;
+
+	if (fstat(fd2, &st) < 0) {
 		error("Error: cannot stat file `%s'", file2);
 		goto clo;
-	} else if ((fz2 = st.st_size, 0)) {
-		/* optimised out */
 	}
+	fz2 = st.st_size;
 
 	if (UNLIKELY(init_chld(ctx) < 0)) {
 		goto clo;
@@ -516,7 +518,7 @@ hxdiff(const char *file1, const char *file2)
 
 	/* now, we read a bit of fd1, hexdump it, feed it to diff's fd1
 	 * then read a bit of fd2, hexdump it, feed it to diff's fd2 */
-	fanout(ctx, fd1, fz2, fd2, fz2);
+	fanout(ctx, fd1, fz1, fd2, fz2);
 
 	/* get the diff tool's exit status et al */
 	rc = fini_diff(ctx);
