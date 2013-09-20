@@ -376,7 +376,7 @@ pollpair(int fds[static 2U])
 	};
 	int npl = 0;
 
-	if (poll(pfds, countof(pfds), -1) <= 0) {
+	if (poll(pfds, countof(pfds), 1) <= 0) {
 		return 0;
 	}
 	if ((pfds[0].revents | pfds[1].revents) & POLLIN) {
@@ -405,23 +405,25 @@ struct fan_s {
 	size_t tot;
 	ssize_t nrd;
 	ssize_t nwr;
-	const int f;
-	const int of;
+	int f;
+	int of;
 };
 
 static size_t
 fanout1(struct fan_s f[static 1U])
 {
-	unsigned int npl = pollpair((int[]){f->f, f->of});
+	unsigned int npl = pollpair((int[]){!f->nrd ? f->f : -1, f->of});
 	size_t res = 0U;
 
 	if (!f->nrd && npl & 1U) {
 		/* reader coru*/
 		if ((f->nrd = read(f->f, f->buf, sizeof(f->buf))) > 0) {
 			goto wr;
+		} else if (f->nrd == 0) {
+			f->f = -1;
 		}
 	}
-	if (f->nwr > 0 && (npl & 1U || true)) {
+	if (f->nwr > 0 && (npl & 2U)) {
 		/* writer coru */
 		clit_buf_t hx;
 		ssize_t nwr;
@@ -462,12 +464,14 @@ fanout(struct clit_chld_s ctx[static 1], int f1, size_t z1, int f2, size_t z2)
 		if (LIKELY(tot1 < z1)) {
 			if (UNLIKELY((tot1 += fanout1(fans + 0U)) >= z1)) {
 				close(fans[0U].of);
+				fans[0U].of = -1;
 			}
 		}
 
 		if (LIKELY(tot2 < z2)) {
 			if (UNLIKELY((tot2 += fanout1(fans + 1U)) >= z2)) {
 				close(fans[1U].of);
+				fans[1U].of = -1;
 			}
 		}
 	}
@@ -492,17 +496,19 @@ hxdiff(const char *file1, const char *file2)
 	} else if ((fd2 = open(file2, O_RDONLY)) < 0) {
 		error("Error: cannot open file `%s'", file2);
 		goto clo;
-	} else if (fstat(fd1, &st) < 0) {
+	}
+
+	if (fstat(fd1, &st) < 0) {
 		error("Error: cannot stat file `%s'", file1);
 		goto clo;
-	} else if ((fz1 = st.st_size, 0)) {
-		/* optimised out */
-	} else if (fstat(fd2, &st) < 0) {
+	}
+	fz1 = st.st_size;
+
+	if (fstat(fd2, &st) < 0) {
 		error("Error: cannot stat file `%s'", file2);
 		goto clo;
-	} else if ((fz2 = st.st_size, 0)) {
-		/* optimised out */
 	}
+	fz2 = st.st_size;
 
 	if (UNLIKELY(init_chld(ctx) < 0)) {
 		goto clo;
@@ -512,7 +518,7 @@ hxdiff(const char *file1, const char *file2)
 
 	/* now, we read a bit of fd1, hexdump it, feed it to diff's fd1
 	 * then read a bit of fd2, hexdump it, feed it to diff's fd2 */
-	fanout(ctx, fd1, fz2, fd2, fz2);
+	fanout(ctx, fd1, fz1, fd2, fz2);
 
 	/* get the diff tool's exit status et al */
 	rc = fini_diff(ctx);
