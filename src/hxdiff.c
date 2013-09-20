@@ -49,6 +49,7 @@
 #include <sys/wait.h>
 #include <string.h>
 #include <errno.h>
+#include <poll.h>
 
 #if !defined LIKELY
 # define LIKELY(_x)	__builtin_expect((_x), 1)
@@ -127,6 +128,21 @@ unblock_sigs(void)
 	return;
 }
 
+static void
+setsock_nonblock(int sock)
+{
+	int opts;
+
+	/* get former options */
+	opts = fcntl(sock, F_GETFL);
+	if (opts < 0) {
+		return;
+	}
+	opts |= O_NONBLOCK;
+	(void)fcntl(sock, F_SETFL, opts);
+	return;
+}
+
 
 static int
 init_chld(struct clit_chld_s UNUSED(ctx)[static 1])
@@ -183,7 +199,6 @@ init_diff(struct clit_chld_s ctx[static 1])
 
 		unblock_sigs();
 
-		close(STDIN_FILENO);
 		/* kick the write ends of our pipes */
 		close(p_exp[1]);
 		close(p_is[1]);
@@ -206,6 +221,10 @@ init_diff(struct clit_chld_s ctx[static 1])
 		ctx->fd_df1 = p_exp[1];
 		ctx->fd_df2 = p_is[1];
 		ctx->chld = diff;
+
+		/* make out descriptors non-blocking */
+		setsock_nonblock(ctx->fd_df1);		
+		setsock_nonblock(ctx->fd_df2);		
 
 		/* diff's stdout can just go straight there */
 		break;
@@ -340,6 +359,121 @@ hexlify(const char *src, size_t ssz, off_t off)
 	return (clit_buf_t){.z = bp - buf, .d = buf};
 }
 
+static unsigned int
+pollpair(int fds[static 2U])
+{
+/* find the pairings of fd1 in/out, return bitmask
+ * iohhee meaning input possible, output possible, hup, hup, err, err */
+#define PIO	(POLLIN | POLLOUT)
+	struct pollfd pfds[] = {
+		{
+			.fd = fds[0],
+			.events = POLLIN,
+		}, {
+			.fd = fds[1],
+			.events = POLLOUT,
+		}
+	};
+	int npl = 0;
+
+	if (poll(pfds, countof(pfds), -1) <= 0) {
+		return 0;
+	}
+	if ((pfds[0].revents | pfds[1].revents) & POLLIN) {
+		npl |= 1;
+	}
+	if ((pfds[0].revents | pfds[1].revents) & POLLOUT) {
+		npl |= 2;
+	}
+	if (pfds[0].revents & POLLHUP) {
+		npl |= 1 << 2U;
+	}
+	if (pfds[1].revents & POLLHUP) {
+		npl |= 2 << 2U;
+	}
+	if (pfds[0].revents & (POLLERR | POLLNVAL)) {
+		npl |= 1 << 4U;
+	}
+	if (pfds[1].revents & (POLLERR | POLLNVAL)) {
+		npl |= 2 << 4U;
+	}
+	return npl;
+}
+
+struct fan_s {
+	char buf[4096U];
+	size_t tot;
+	ssize_t nrd;
+	ssize_t nwr;
+	const int f;
+	const int of;
+};
+
+static size_t
+fanout1(struct fan_s f[static 1U])
+{
+	unsigned int npl = pollpair((int[]){f->f, f->of});
+	size_t res = 0U;
+
+	if (!f->nrd && npl & 1U) {
+		/* reader coru*/
+		if ((f->nrd = read(f->f, f->buf, sizeof(f->buf))) > 0) {
+			goto wr;
+		}
+	}
+	if (f->nwr > 0 && (npl & 1U || true)) {
+		/* writer coru */
+		clit_buf_t hx;
+		ssize_t nwr;
+
+	wr:
+		hx = hexlify(f->buf, f->nrd, f->tot);
+		if (UNLIKELY(!f->nwr)) {
+			f->nwr = hx.z;
+		} else {
+			hx.d += (hx.z - f->nwr);
+		}
+		if ((nwr = write(f->of, hx.d, f->nwr)) > 0 &&
+		    (f->nwr -= nwr) == 0U) {
+			/* ah finished writing, innit? */
+			f->tot += (res = f->nrd);
+			f->nrd = 0U;
+		}
+	}
+	return res;
+}
+
+static int
+fanout(struct clit_chld_s ctx[static 1], int f1, size_t z1, int f2, size_t z2)
+{
+	struct fan_s fans[] = {
+		{
+			.f = f1,
+			.of = ctx->fd_df1,
+		}, {
+			.f = f2,
+			.of = ctx->fd_df2,
+		}
+	};
+	size_t tot1 = 0U;
+	size_t tot2 = 0U;
+
+	while (tot1 < z1 || tot2 < z2) {
+		if (LIKELY(tot1 < z1)) {
+			if (UNLIKELY((tot1 += fanout1(fans + 0U)) >= z1)) {
+				close(fans[0U].of);
+			}
+		}
+
+		if (LIKELY(tot2 < z2)) {
+			if (UNLIKELY((tot2 += fanout1(fans + 1U)) >= z2)) {
+				close(fans[1U].of);
+			}
+		}
+	}
+	return 0;
+}
+
 
 static int
 hxdiff(const char *file1, const char *file2)
@@ -378,37 +512,7 @@ hxdiff(const char *file1, const char *file2)
 
 	/* now, we read a bit of fd1, hexdump it, feed it to diff's fd1
 	 * then read a bit of fd2, hexdump it, feed it to diff's fd2 */
-	{
-		char buf[4096U];
-		size_t tot1 = 0U;
-		size_t tot2 = 0U;
-		ssize_t nrd;
-
-		do {
-			if (UNLIKELY(tot1 >= fz1)) {
-				/* nothing coming from fd1 anymore */
-				;
-			} else if ((nrd = read(fd1, buf, sizeof(buf))) > 0) {
-				clit_buf_t hx = hexlify(buf, nrd, tot1);
-
-				write(ctx->fd_df1, hx.d, hx.z);
-				if (UNLIKELY((tot1 += nrd) >= fz1)) {
-					close(ctx->fd_df1);
-				}
-			}
-			if (UNLIKELY(tot2 >= fz2)) {
-				/* nothing coming from fd2 anymore */
-				;
-			} else if ((nrd = read(fd2, buf, sizeof(buf))) > 0) {
-				clit_buf_t hx = hexlify(buf, nrd, tot2);
-
-				write(ctx->fd_df2, hx.d, hx.z);
-				if (UNLIKELY((tot2 += nrd) >= fz2)) {
-					close(ctx->fd_df2);
-				}
-			}
-		} while (tot1 < fz1 || tot2 < fz2);
-	}
+	fanout(ctx, fd1, fz2, fd2, fz2);
 
 	/* get the diff tool's exit status et al */
 	rc = fini_diff(ctx);
