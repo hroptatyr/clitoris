@@ -1,0 +1,6 @@
+#!/usr/bin/clitoris ## -*- shell-script -*-
+
+$ hxdiff "${srcdir}/hxdiff_05.clit" "${srcdir}/hxdiff_04.clit" >/dev/null
+$
+
+## hxdiff_05.clit ends here

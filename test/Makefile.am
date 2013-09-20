@@ -64,6 +64,7 @@ TESTS += hxdiff_01.clit
 XFAIL_TESTS += hxdiff_02.clit
 TESTS += hxdiff_03.clit
 TESTS += hxdiff_04.clit
+XFAIL_TESTS += hxdiff_05.clit
 
 TESTS += ignore_01.clit
 TESTS += ignore_02.clit
