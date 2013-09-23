@@ -408,13 +408,13 @@ find_negexp(struct clit_tst_s tst[static 1])
 	with (const char *cmd = tst->cmd.d, *const ec = cmd + tst->cmd.z) {
 		unsigned int exp = 0U;
 
-		switch (*cmd++) {
+		switch (*cmd) {
 		case '!'/*NEG*/:
 			exp = 255U;
 			break;
 		case '?'/*EXP*/:;
 			char *p;
-			exp = strtoul(cmd, &p, 10);
+			exp = strtoul(cmd + 1U, &p, 10);
 			cmd = cmd + (p - cmd);
 			if (isspace(*cmd)) {
 				break;
@@ -436,7 +436,7 @@ static int
 find_suppdiff(struct clit_tst_s tst[static 1])
 {
 	with (const char *cmd = tst->cmd.d, *const ec = cmd + tst->cmd.z) {
-		switch (*cmd++) {
+		switch (*cmd) {
 		case '@':
 			break;
 		default:
