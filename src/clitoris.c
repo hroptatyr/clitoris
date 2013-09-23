@@ -121,6 +121,12 @@ struct clit_tst_s {
 	/** don't fail when the command returns non-SUCCESS */
 	unsigned int ign_ret:1;
 
+	/** don't pass the output on to external differ */
+	unsigned int supp_diff:1;
+
+	/* padding */
+	unsigned int:5;
+
 	/** expect this return code, or any but 0 if all bits are set */
 	unsigned int exp_ret:8;
 };
@@ -410,12 +416,10 @@ find_negexp(struct clit_tst_s tst[static 1])
 			char *p;
 			exp = strtoul(cmd, &p, 10);
 			cmd = cmd + (p - cmd);
-			break;
+			if (isspace(*cmd)) {
+				break;
+			}
 		default:
-			return 0;
-		}
-
-		if (!isspace(*cmd)) {
 			return 0;
 		}
 
@@ -424,6 +428,27 @@ find_negexp(struct clit_tst_s tst[static 1])
 		tst->cmd.z -= (cmd - tst->cmd.d);
 		tst->cmd.d = cmd;
 		tst->exp_ret = exp;
+	}
+	return 0;
+}
+
+static int
+find_suppdiff(struct clit_tst_s tst[static 1])
+{
+	with (const char *cmd = tst->cmd.d, *const ec = cmd + tst->cmd.z) {
+		switch (*cmd++) {
+		case '@':
+			break;
+		default:
+			return 0;
+		}
+
+		/* now, fast-forward to the actual command, and reass */
+		while (++cmd < ec && isspace(*cmd));
+		tst->cmd.z -= (cmd - tst->cmd.d);
+		tst->cmd.d = cmd;
+		tst->supp_diff = 1U;
+		tst->ign_out = 1U;
 	}
 	return 0;
 }
@@ -463,6 +488,9 @@ find_tst(struct clit_tst_s tst[static 1], const char *bp, size_t bz)
 
 	/* oh let's see if we should ignore things */
 	find_ignore(tst);
+
+	/* check for suppress diff */
+	find_suppdiff(tst);
 
 	/* check for expect and negate operators */
 	find_negexp(tst);
@@ -655,7 +683,7 @@ diff_out(struct clit_chld_s ctx[static 1], clit_bit_t exp)
 }
 
 static int
-init_tst(struct clit_chld_s ctx[static 1])
+init_tst(struct clit_chld_s ctx[static 1], struct clit_tst_s tst[static 1])
 {
 /* set up a connection with /bin/sh to pipe to and read from */
 	int pty;
@@ -694,7 +722,10 @@ init_tst(struct clit_chld_s ctx[static 1])
 		/* read from pin and write to pou */
 		if (LIKELY(!ctx->ptyp)) {
 			close(STDIN_FILENO);
-			close(STDOUT_FILENO);
+			if (!tst->supp_diff) {
+				/* only if we want the output differ */
+				close(STDOUT_FILENO);
+			}
 			/* pin[0] ->stdin */
 			dup2(pin[0], STDIN_FILENO);
 		} else {
@@ -707,7 +738,9 @@ init_tst(struct clit_chld_s ctx[static 1])
 		close(pin[1]);
 
 		/* stdout -> pou[1] */
-		dup2(pou[1], STDOUT_FILENO);
+		if (!tst->supp_diff) {
+			dup2(pou[1], STDOUT_FILENO);
+		}
 		close(pou[0]);
 		close(pou[1]);
 		execl("/bin/sh", "sh", NULL);
@@ -731,7 +764,11 @@ init_tst(struct clit_chld_s ctx[static 1])
 			close(per[1]);
 		}
 		/* ... and read end of pou */
-		ctx->pou = pou[0];
+		if (!tst->supp_diff) {
+			ctx->pou = pou[0];
+		} else {
+			ctx->pou = -1;
+		}
 
 		if (LIKELY(ctx->pll >= 0)) {
 			static struct epoll_event ev = {
@@ -750,7 +787,7 @@ run_tst(struct clit_chld_s ctx[static 1], struct clit_tst_s tst[static 1])
 	int st;
 	int rc;
 
-	if (UNLIKELY(init_tst(ctx) < 0)) {
+	if (UNLIKELY(init_tst(ctx, tst) < 0)) {
 		return -1;
 	}
 	write(ctx->pin, tst->cmd.d, tst->cmd.z);
@@ -764,9 +801,11 @@ run_tst(struct clit_chld_s ctx[static 1], struct clit_tst_s tst[static 1])
 		write(ctx->pin, "exit $?\n", 8U);
 	}
 
-	rc = diff_out(ctx, tst->out);
-	if (tst->ign_out) {
-		rc = 0;
+	if (!tst->supp_diff) {
+		rc = diff_out(ctx, tst->out);
+		if (tst->ign_out) {
+			rc = 0;
+		}
 	}
 
 	while (waitpid(ctx->chld, &st, 0) != ctx->chld);
