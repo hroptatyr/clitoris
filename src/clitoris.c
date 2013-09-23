@@ -806,6 +806,8 @@ run_tst(struct clit_chld_s ctx[static 1], struct clit_tst_s tst[static 1])
 		if (tst->ign_out) {
 			rc = 0;
 		}
+	} else {
+		rc = 0;
 	}
 
 	while (waitpid(ctx->chld, &st, 0) != ctx->chld);
