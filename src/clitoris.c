@@ -410,12 +410,10 @@ find_negexp(struct clit_tst_s tst[static 1])
 			char *p;
 			exp = strtoul(cmd, &p, 10);
 			cmd = cmd + (p - cmd);
-			break;
+			if (isspace(*cmd)) {
+				break;
+			}
 		default:
-			return 0;
-		}
-
-		if (!isspace(*cmd)) {
 			return 0;
 		}
 
