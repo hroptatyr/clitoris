@@ -1,0 +1,10 @@
+#!/usr/bin/clitoris  ## -*- shell-script -*-
+
+## we expect failure, so this script will succeed
+$ echo foo > "foo"
+$ echo bar > "bar"
+$ @ ?1 hxdiff foo bar
+$ ignore rm -- "foo" "bar"
+$ 
+
+## supp_diff_01.clit ends here

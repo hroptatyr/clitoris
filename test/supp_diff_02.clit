@@ -1,0 +1,8 @@
+#!/usr/bin/clitoris  ## -*- shell-script -*-
+
+$ echo foo > "foo"
+$ @ hxdiff foo foo
+$ ignore rm -- "foo"
+$
+
+## supp_diff_02.clit ends here
