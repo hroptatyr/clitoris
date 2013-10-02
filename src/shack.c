@@ -533,7 +533,7 @@ main(int argc, char *argv[])
 
 	if (cmdline_parser(argc, argv, argi)) {
 		goto out;
-	} else if (argi->inputs_num < 1) {
+	} else if (argi->inputs_num < 1U) {
 		print_help_common();
 		goto out;
 	}
@@ -550,7 +550,7 @@ main(int argc, char *argv[])
 
 		/* default for now is ret code 1 */
 		rc = 1;
-		for (unsigned int i = 1; i < argi->inputs_num; i++) {
+		for (unsigned int i = 1U; i < argi->inputs_num; i++) {
 			const char *arg = argi->inputs[i];
 			sha_t x = str_to_sha(arg);
 

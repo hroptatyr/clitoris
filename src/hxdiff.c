@@ -554,7 +554,7 @@ main(int argc, char *argv[])
 
 	if (cmdline_parser(argc, argv, argi)) {
 		goto out;
-	} else if (argi->inputs_num != 2) {
+	} else if (argi->inputs_num != 2U) {
 		print_help_common();
 		goto out;
 	}
