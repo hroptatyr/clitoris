@@ -30,15 +30,15 @@ clitoris_CPPFLAGS += -D_GNU_SOURCE
 clitoris_LDFLAGS = $(AM_LDFLAGS)
 clitoris_LDADD = libclit.a
 clitoris_LDADD += -lutil
-BUILT_SOURCES += clitoris.x clitoris.h
+BUILT_SOURCES += clitoris.x clitoris.xh
 
 bin_PROGRAMS += shack
 shack_LDADD = libclit.a
-BUILT_SOURCES += shack.x shack.h
+BUILT_SOURCES += shack.x shack.xh
 
 bin_PROGRAMS += hxdiff
 hxdiff_LDADD = libclit.a
-BUILT_SOURCES += hxdiff.x hxdiff.h
+BUILT_SOURCES += hxdiff.x hxdiff.xh
 
 
 ## generate version.c from .c.in
@@ -46,13 +46,13 @@ version.c: version.c.in $(top_builddir)/version.mk
 	sed -e 's,[@]VERSION[@],$(VERSION),g' <$(srcdir)/$@.in >$@
 
 ## ggo rule
-%.x %.h: %.ggo
-	$(AM_V_GEN) gengetopt -l -c x -i $< -F $* \
+%.x %.xh: %.ggo
+	$(AM_V_GEN) gengetopt -l -c x -H xh -i $< -F $* \
 	&& sed \
 	  -e 's,config.h,version.h,g' \
 	  -e 's,\(.*\)_PARSER_VERSION VERSION,\1_PARSER_VERSION $(PACKAGE)_version_string,g' \
-	  $*.h >$*.h-t \
-	&& mv $*.h-t $*.h
+	  $*.xh >$*.xh-t \
+	&& mv $*.xh-t $*.xh
 
 
 ## for dist or dist check we need binaries, so help2man can work

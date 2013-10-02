@@ -539,7 +539,7 @@ out:
 # pragma warning (disable:593)
 # pragma warning (disable:181)
 #endif	/* __INTEL_COMPILER */
-#include "hxdiff.h"
+#include "hxdiff.xh"
 #include "hxdiff.x"
 #if defined __INTEL_COMPILER
 # pragma warning (default:593)
