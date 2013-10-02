@@ -41,6 +41,8 @@ hxdiff_LDADD = libclit.a
 BUILT_SOURCES += hxdiff.x hxdiff.xh
 
 
+analysis: $(bin_PROGRAMS:%=%.sa)
+
 ## generate version.c from .c.in
 version.c: version.c.in $(top_builddir)/version.mk
 	sed -e 's,[@]VERSION[@],$(VERSION),g' <$(srcdir)/$@.in >$@
@@ -65,5 +67,11 @@ dist-hook: $(bin_PROGRAMS)
 ## Create assembler output (debugging purposes only)
 .c.s:
 	$(COMPILE) -S -c $(AM_CFLAGS) $<
+
+## Create assembler output (debugging purposes only)
+.c.sa:
+	$(AM_V_GEN) clang -std=gnu99 --analyze \
+		$(AM_CFLAGS) $(AM_CPPFLAGS) -D_GNU_SOURCE \
+		-I$(builddir) -I$(srcdir) -DHAVE_CONFIG_H $< -o $@
 
 ## Makefile.am ends here
