@@ -518,7 +518,7 @@ nibble:
 # pragma warning (disable:593)
 # pragma warning (disable:181)
 #endif	/* __INTEL_COMPILER */
-#include "shack.h"
+#include "shack.xh"
 #include "shack.x"
 #if defined __INTEL_COMPILER
 # pragma warning (default:593)

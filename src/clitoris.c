@@ -1007,7 +1007,7 @@ out:
 # pragma warning (disable:593)
 # pragma warning (disable:181)
 #endif	/* __INTEL_COMPILER */
-#include "clitoris.h"
+#include "clitoris.xh"
 #include "clitoris.x"
 #if defined __INTEL_COMPILER
 # pragma warning (default:593)
