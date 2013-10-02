@@ -48,8 +48,8 @@ processed from top to bottom, just like in a real shell:
     [OUTPUT2]
     $
 
-and the whole file is considered passed when every single command line
-returns successfully.
+and the whole test file is considered passing when every single command
+line returns successfully.
 
 While therefore technically it's possible to stuff several regressions
 into one file, the idea was rather to allow for preparation and clean-up
