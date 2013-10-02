@@ -5,10 +5,21 @@ A command-line tool to run automated tests for command-line
 applications.  Much like [expect][1] but with a syntax that actually
 resembles the command-lines you'd be otherwise executing in the shell.
 
-Syntax
-======
+Why?
+----
+Code snippets for command-line tools of the form below appear quite
+frequently; in the docs, in bug reports, on Q&A sites, in examples on
+blogs, etc.  They are easy to grasp, easy to produce and easily
+interchangeable via copy'n'paste.
 
-Syntax of clit files:
+The idea to somehow parse those snippets and evaluate them automatically
+isn't far-fetched.  This toolchain does exactly that, be it with a
+slightly less free syntax, and turns those snippets into regression
+tests.
+
+How?
+----
+Tests are organised in files.  One test, one file.  The basic syntax is:
 
     $ COMMANDLINE
     [EXPECTED OUTPUT]
@@ -28,6 +39,24 @@ The concluding `$` on its own demarks the end of the test file.
 Anything beyond will be blissfully ignored.  Also anything before the
 initial `$` line will be ignored.
 
+One test file can issue more than one command line.  They will be
+processed from top to bottom, just like in a real shell:
+
+    $ COMMANDLINE1
+    [OUTPUT1]
+    $ COMMANDLINE2
+    [OUTPUT2]
+    $
+
+and the whole file is considered passed when every single command line
+returns successfully.
+
+While therefore technically it's possible to stuff several regressions
+into one file, the idea was rather to allow for preparation and clean-up
+work in the same file (where it actually belongs).
+
+Practical examples
+------------------
 The following example, when run through clitoris, would produce a return
 code of 0 and no output:
 
@@ -144,3 +173,5 @@ a reference file that contains zeroes only:
     -00000010  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00   |................|
     +00000010  00 01 00 00 00 00 00 00  00 00 00 00 00 00 00 00   |................|
 
+
+  [1]: http://expect.sourceforge.net/
