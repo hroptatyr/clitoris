@@ -53,7 +53,7 @@ version.c: version.c.in $(top_builddir)/version.mk
 
 ## ggo rule
 %.x %.xh: %.ggo
-	$(AM_V_GEN) gengetopt -l -c x -H xh -i $< -F $* \
+	$(AM_V_GEN) gengetopt -l -G -c x -H xh -i $< -F $* \
 	&& sed \
 	  -e 's,config.h,version.h,g' \
 	  -e 's,\(.*\)_PARSER_VERSION VERSION,\1_PARSER_VERSION $(PACKAGE)_version_string,g' \
