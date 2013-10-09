@@ -50,7 +50,9 @@
 #include <string.h>
 #include <ctype.h>
 #include <errno.h>
-#include <pty.h>
+#if defined HAVE_PTY_H
+# include <pty.h>
+#endif	/* HAVE_PTY_H */
 /* check for me */
 #include <wordexp.h>
 
@@ -271,6 +273,7 @@ unblock_sig(int sig)
 	return;
 }
 
+#if defined HAVE_PTY_H
 static pid_t
 pfork(int *pty)
 {
@@ -280,6 +283,14 @@ pfork(int *pty)
 	}
 	return forkpty(pty, NULL, NULL, NULL);
 }
+#else  /* !HAVE_PTY_H */
+static pid_t
+pfork(int *pty)
+{
+	fputs("pseudo-tty not supported\n", stderr);
+	return -1;
+}
+#endif	/* HAVE_PTY_H */
 
 
 static const char *
