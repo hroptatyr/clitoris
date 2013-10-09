@@ -40,6 +40,9 @@ AC_PROG_RANLIB
 
 AM_MISSING_PROG([HELP2MAN], [help2man], ["${missing_dir}"])
 
+## check for pseudo-tty support
+AC_CHECK_HEADERS([pty.h])
+
 
 AC_CONFIG_FILES([Makefile])
 AC_CONFIG_FILES([src/Makefile])
