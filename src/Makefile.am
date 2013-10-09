@@ -23,6 +23,9 @@ EXTRA_DIST += version.c.in
 noinst_LIBRARIES += libclit.a
 libclit_a_SOURCES = version.c version.h
 
+if NEED_GETOPT_H
+BUILT_SOURCES += getopt.h
+endif  NEED_GETOPT_H
 
 bin_PROGRAMS += clitoris
 clitoris_CPPFLAGS = $(AM_CPPFLAGS)
@@ -55,6 +58,10 @@ version.c: version.c.in $(top_builddir)/version.mk
 	  -e 's,\(.*\)_PARSER_VERSION VERSION,\1_PARSER_VERSION $(PACKAGE)_version_string,g' \
 	  $*.xh >$*.xh-t \
 	&& mv $*.xh-t $*.xh
+
+## for AIX that doesn't ship a getopt.h
+getopt.h: $(srcdir)/getopt.h.in
+	$(AM_V_GEN) cp $(srcdir)/getopt.h.in $@
 
 
 ## for dist or dist check we need binaries, so help2man can work

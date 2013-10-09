@@ -43,6 +43,10 @@ AM_MISSING_PROG([HELP2MAN], [help2man], ["${missing_dir}"])
 ## check for pseudo-tty support
 AC_CHECK_HEADERS([pty.h])
 
+## check for getopt.h
+AC_CHECK_HEADERS([getopt.h])
+AM_CONDITIONAL([NEED_GETOPT_H], [test "${ac_cv_header_getopt_h}" != "yes"])
+
 
 AC_CONFIG_FILES([Makefile])
 AC_CONFIG_FILES([src/Makefile])
