@@ -26,6 +26,7 @@ libclit_a_SOURCES = version.c version.h
 if NEED_GETOPT_H
 BUILT_SOURCES += getopt.h
 endif  NEED_GETOPT_H
+EXTRA_DIST += getopt.h.in
 
 bin_PROGRAMS += clitoris
 clitoris_CPPFLAGS = $(AM_CPPFLAGS)
