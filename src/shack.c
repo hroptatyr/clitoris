@@ -349,7 +349,7 @@ shaf(sha_t *tgt, const char *fn)
 
 	/* get the file size */
 	if ((fz = st.st_size) == 0U) {
-		h = sha_fin((uint32_t[]){}, h, 0U);
+		h = sha_fin((uint32_t[16U]){}, h, 0U);
 		goto out;
 	}
 	/* now map considerable portions of the file and process */
