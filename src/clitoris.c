@@ -839,6 +839,9 @@ run_tst(struct clit_chld_s ctx[static 1], struct clit_tst_s tst[static 1])
 	close(ctx->pou);
 	/* also connect per's out end with stderr */
 	if (UNLIKELY(ctx->ptyp)) {
+#if !defined SPLICE_F_MOVE
+# define SPLICE_F_MOVE		(0)
+#endif	/* SPLICE_F_MOVE */
 		for (ssize_t nsp;
 		     (nsp = splice(
 			      ctx->per, NULL, STDERR_FILENO, NULL,
