@@ -298,7 +298,7 @@ sha_chunk(const uint32_t b32[static 16], sha_t old)
 }
 
 static sha_t
-sha_fin(const uint32_t b32[static 1], sha_t old, size_t fz/*in bytes*/)
+sha_fin(const uint32_t b32[static 16U], sha_t old, size_t fz/*in bytes*/)
 {
 	uint32_t l[16U];
 	size_t fz512 = fz % 64U;
@@ -349,7 +349,7 @@ shaf(sha_t *tgt, const char *fn)
 
 	/* get the file size */
 	if ((fz = st.st_size) == 0U) {
-		h = sha_fin("", h, 0U);
+		h = sha_fin((uint32_t[16U]){}, h, 0U);
 		goto out;
 	}
 	/* now map considerable portions of the file and process */
