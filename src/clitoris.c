@@ -37,6 +37,7 @@
 #if defined HAVE_CONFIG_H
 # include "config.h"
 #endif	/* HAVE_CONFIG_H */
+#define _ALL_SOURCE
 #include <unistd.h>
 #include <stdarg.h>
 #include <stdlib.h>
@@ -47,10 +48,14 @@
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
+#include <sys/types.h>
+#include <sys/socket.h>
 #include <string.h>
 #include <ctype.h>
 #include <errno.h>
-#include <pty.h>
+#if defined HAVE_PTY_H
+# include <pty.h>
+#endif	/* HAVE_PTY_H */
 /* check for me */
 #include <wordexp.h>
 
@@ -271,6 +276,7 @@ unblock_sig(int sig)
 	return;
 }
 
+#if defined HAVE_PTY_H
 static pid_t
 pfork(int *pty)
 {
@@ -280,6 +286,14 @@ pfork(int *pty)
 	}
 	return forkpty(pty, NULL, NULL, NULL);
 }
+#else  /* !HAVE_PTY_H */
+static pid_t
+pfork(int *pty __attribute__((unused)))
+{
+	fputs("pseudo-tty not supported\n", stderr);
+	return -1;
+}
+#endif	/* HAVE_PTY_H */
 
 
 static const char *
@@ -828,6 +842,9 @@ run_tst(struct clit_chld_s ctx[static 1], struct clit_tst_s tst[static 1])
 	close(ctx->pou);
 	/* also connect per's out end with stderr */
 	if (UNLIKELY(ctx->ptyp)) {
+#if !defined SPLICE_F_MOVE
+# define SPLICE_F_MOVE		(0)
+#endif	/* SPLICE_F_MOVE */
 		for (ssize_t nsp;
 		     (nsp = splice(
 			      ctx->per, NULL, STDERR_FILENO, NULL,

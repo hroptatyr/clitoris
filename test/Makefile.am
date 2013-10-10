@@ -32,11 +32,13 @@ TESTS += diff_04.clit
 XFAIL_TESTS += early_01.clit
 XFAIL_TESTS += early_02.clit
 
+if HAVE_PTY_H
 check_PROGRAMS += tty_01
 TESTS += tty_01.clit
 
 XFAIL_TESTS += tty_02.clit
 XFAIL_TESTS += tty_03.clit
+endif  HAVE_PTY_H
 
 TESTS += out-in-file_01.clit
 TESTS += out-in-file_02.clit

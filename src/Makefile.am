@@ -7,7 +7,7 @@ LANG = C
 LC_ALL = C
 
 AM_CFLAGS = $(EXTRA_CFLAGS)
-AM_CPPFLAGS = -D_POSIX_C_SOURCE=200112L -D_XOPEN_SOURCE=600 -D_BSD_SOURCE
+AM_CPPFLAGS = -D_POSIX_C_SOURCE=200112L -D_XOPEN_SOURCE=700 -D_BSD_SOURCE
 
 bin_PROGRAMS =
 noinst_PROGRAMS =
@@ -23,13 +23,19 @@ EXTRA_DIST += version.c.in
 noinst_LIBRARIES += libclit.a
 libclit_a_SOURCES = version.c version.h
 
+if NEED_GETOPT_H
+BUILT_SOURCES += getopt.h
+endif  NEED_GETOPT_H
+EXTRA_DIST += getopt.h.in
 
 bin_PROGRAMS += clitoris
 clitoris_CPPFLAGS = $(AM_CPPFLAGS)
 clitoris_CPPFLAGS += -D_GNU_SOURCE
 clitoris_LDFLAGS = $(AM_LDFLAGS)
 clitoris_LDADD = libclit.a
+if HAVE_PTY_H
 clitoris_LDADD += -lutil
+endif  HAVE_PTY_H
 BUILT_SOURCES += clitoris.x clitoris.xh
 
 bin_PROGRAMS += shack
@@ -49,12 +55,16 @@ version.c: version.c.in $(top_builddir)/version.mk
 
 ## ggo rule
 %.x %.xh: %.ggo
-	$(AM_V_GEN) gengetopt -l -c x -H xh -i $< -F $* \
+	$(AM_V_GEN) gengetopt -l -G -c x -H xh -i $< -F $* \
 	&& sed \
 	  -e 's,config.h,version.h,g' \
 	  -e 's,\(.*\)_PARSER_VERSION VERSION,\1_PARSER_VERSION $(PACKAGE)_version_string,g' \
 	  $*.xh >$*.xh-t \
 	&& mv $*.xh-t $*.xh
+
+## for AIX that doesn't ship a getopt.h
+getopt.h: $(srcdir)/getopt.h.in
+	$(AM_V_GEN) cp $(srcdir)/getopt.h.in $@
 
 
 ## for dist or dist check we need binaries, so help2man can work
