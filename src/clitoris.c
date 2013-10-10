@@ -288,7 +288,7 @@ pfork(int *pty)
 }
 #else  /* !HAVE_PTY_H */
 static pid_t
-pfork(int *pty)
+pfork(int *pty __attribute__((unused)))
 {
 	fputs("pseudo-tty not supported\n", stderr);
 	return -1;
