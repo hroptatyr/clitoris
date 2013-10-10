@@ -33,7 +33,9 @@ clitoris_CPPFLAGS = $(AM_CPPFLAGS)
 clitoris_CPPFLAGS += -D_GNU_SOURCE
 clitoris_LDFLAGS = $(AM_LDFLAGS)
 clitoris_LDADD = libclit.a
+if HAVE_PTY_H
 clitoris_LDADD += -lutil
+endif  HAVE_PTY_H
 BUILT_SOURCES += clitoris.x clitoris.xh
 
 bin_PROGRAMS += shack
