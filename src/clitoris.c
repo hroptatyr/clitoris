@@ -156,6 +156,8 @@ error(const char *fmt, ...)
 	return;
 }
 
+#define CLIT_BIT_FD(x)	(clit_bit_fd_p(x) ? (int)(x).z : -1)
+
 static inline __attribute__((const, pure)) bool
 clit_bit_buf_p(clit_bit_t x)
 {
@@ -583,40 +585,35 @@ fini_chld(struct clit_chld_s ctx[static 1] __attribute__((unused)))
 	return 0;
 }
 
-static inline void
-feed_bit(int where, clit_bit_t bit)
+static pid_t
+diff_bits(clit_bit_t exp, clit_bit_t act)
 {
-	if (clit_bit_buf_p(bit)) {
-		write(where, bit.d, bit.z);
-	}
-	close(where);
-	return;
-}
-
-static int
-pipe_bits(int p[static 2], clit_bit_t b)
-{
-	if (clit_bit_buf_p(b) && UNLIKELY(pipe(p)) < 0) {
-		return -1;
-	} else if (clit_bit_fd_p(b)) {
-		p[0] = (int)b.z;
-		p[1] = -1;
-	} else if (clit_bit_fn_p(b)) {
-		p[0] = -1;
-		p[1] = -1;
-	}
-	return 0;
-}
-
-static int
-diff_bits(clit_bit_t exp, clit_bit_t is)
-{
-	int pin_a[2];
-	int pin_b[2];
 	pid_t difftool;
+#if !defined L_tmpnam
+# define L_tmpnam	(PATH_MAX)
+#endif	/* !L_tmpnam */
+	static char expfn[L_tmpnam];
+	static char actfn[L_tmpnam];
 
-	pipe_bits(pin_a, exp);
-	pipe_bits(pin_b, is);
+	/* we want fifos for descriptors and buffers
+	 * and real file names for files */
+	if (!clit_bit_fn_p(exp) &&
+	    (tmpnam(expfn) == NULL || mkfifo(expfn, 0666) < 0)) {
+		goto out;
+	} else if (clit_bit_fn_p(exp) && strlen(exp.d) >= sizeof(expfn)) {
+		goto out;
+	} else if (clit_bit_fn_p(exp) &&
+		   memcpy(expfn, exp.d, strlen(exp.d)) == NULL) {
+		goto out;
+	} else if (!clit_bit_fn_p(act) &&
+		   (tmpnam(actfn) == NULL || mkfifo(actfn, 0666) < 0)) {
+		goto out;
+	} else if (clit_bit_fn_p(act) && strlen(act.d) >= sizeof(actfn)) {
+		goto out;
+	} else if (clit_bit_fn_p(act) &&
+		   memcpy(actfn, act.d, strlen(act.d)) == NULL) {
+		goto out;
+	}
 
 	block_sigs();
 
@@ -628,35 +625,20 @@ diff_bits(clit_bit_t exp, clit_bit_t is)
 
 	case 0:;
 		/* i am the child */
-		static char fa[64];
-		static char fb[64];
 		static char *const diff_opt[] = {
 			"diff",
 			"-u", "--label=expected", "--label=actual",
-			fa, fb, NULL,
+			expfn, actfn, NULL,
 		};
 
 		unblock_sigs();
 
+		/* don't allow input at all */
 		close(STDIN_FILENO);
-		close(STDOUT_FILENO);
-		/* kick the write ends of our pipes */
-		close(pin_a[1]);
-		close(pin_b[1]);
 
-		/* stdout -> stderr */
+		/* diff stdout -> stderr */
 		dup2(STDERR_FILENO, STDOUT_FILENO);
-
-		if (!clit_bit_fn_p(exp)) {
-			snprintf(fa, sizeof(fa), "/dev/fd/%d", *pin_a);
-		} else {
-			snprintf(fa, sizeof(fa), "%s", exp.d);
-		}
-		if (!clit_bit_fn_p(is)) {
-			snprintf(fb, sizeof(fb), "/dev/fd/%d", *pin_b);
-		} else {
-			snprintf(fb, sizeof(fb), "%s", is.d);
-		}
+		close(STDERR_FILENO);
 
 		execvp("diff", diff_opt);
 		error("execlp failed");
@@ -664,28 +646,61 @@ diff_bits(clit_bit_t exp, clit_bit_t is)
 
 	default:;
 		/* i am the parent */
-		int st;
+		int expfd = -1;
+		int actfd = -1;
 
 		/* clean up descriptors */
-		close(*pin_a);
-		close(*pin_b);
+		if (!clit_bit_fn_p(exp) &&
+		    (expfd = open(expfn, O_WRONLY)) < 0) {
+			goto clobrk;
+		} else if (clit_bit_fd_p(exp) &&
+			   (dup2(expfd, CLIT_BIT_FD(exp)) < 0 ||
+			    close(expfd) < 0)) {
+			goto clobrk;
+		} else if (!clit_bit_fn_p(act) &&
+			   (actfd = open(actfn, O_WRONLY)) < 0) {
+			goto clobrk;
+		} else if (clit_bit_fd_p(act) &&
+			   (dup2(actfd, CLIT_BIT_FD(act)) < 0 ||
+			    close(actfd) < 0)) {
+			goto clobrk;
+		}
 
 		/* feed the stuff we want diff'd to the descriptors */
-		feed_bit(pin_a[1], exp);
-		feed_bit(pin_b[1], is);
-
-		unblock_sigs();
-
-		while (waitpid(difftool, &st, 0) != difftool);
-		if (WIFEXITED(st)) {
-			return WEXITSTATUS(st);
+		if (clit_bit_buf_p(exp)) {
+			write(expfd, exp.d, exp.z);
+			close(expfd);
 		}
+		if (clit_bit_buf_p(act)) {
+			write(actfd, act.d, act.z);
+			close(actfd);
+		}
+		unblock_sigs();
+		break;
+	clobrk:
+		if (expfd >= 0) {
+			close(expfd);
+		}
+		if (actfd >= 0) {
+			close(actfd);
+		}
+		kill(difftool, SIGTERM);
+		difftool = -1;
 		break;
 	}
-	return -1;
+
+	unblock_sigs();
+out:
+	if (!clit_bit_fn_p(exp) && *expfn) {
+		unlink(expfn);
+	}
+	if (!clit_bit_fn_p(act) && *actfn) {
+		unlink(actfn);
+	}
+	return difftool;
 }
 
-static int
+static pid_t
 diff_out(struct clit_chld_s ctx[static 1], clit_bit_t exp)
 {
 	return diff_bits(exp, clit_make_fd(ctx->pou));
@@ -786,8 +801,9 @@ init_tst(struct clit_chld_s ctx[static 1], struct clit_tst_s tst[static 1])
 static int
 run_tst(struct clit_chld_s ctx[static 1], struct clit_tst_s tst[static 1])
 {
+	int diffpid = -1;
+	int rc = 0;
 	int st;
-	int rc;
 
 	if (UNLIKELY(init_tst(ctx, tst) < 0)) {
 		return -1;
@@ -804,31 +820,37 @@ run_tst(struct clit_chld_s ctx[static 1], struct clit_tst_s tst[static 1])
 	}
 
 	if (!tst->supp_diff) {
-		rc = diff_out(ctx, tst->out);
-		if (tst->ign_out) {
-			rc = 0;
-		}
-	} else {
-		rc = 0;
+		diffpid = diff_out(ctx, tst->out);
 	}
 
+	/* wait for the beef child */
 	while (waitpid(ctx->chld, &st, 0) != ctx->chld);
 	if (LIKELY(WIFEXITED(st))) {
-		int tst_rc = WEXITSTATUS(st);
+		rc = WEXITSTATUS(st);
 
-		if (tst->exp_ret == tst_rc) {
-			tst_rc = 0;
-		} else if (tst->exp_ret == 255U && tst_rc) {
-			tst_rc = 0;
+		if (tst->exp_ret == rc) {
+			rc = 0;
+		} else if (tst->exp_ret == 255U && rc) {
+			rc = 0;
 		} else {
-			tst_rc = 1;
+			rc = 1;
 		}
-
-		/* now assign */
-		rc = rc ?: tst_rc;
 	} else {
 		rc = 1;
 	}
+
+	/* now indicate we won't be reading stuff from now on */
+	close(ctx->pou);
+	/* ... and finally wait for the differ */
+	while (diffpid > 0 && waitpid(diffpid, &st, 0) != diffpid);
+	if (LIKELY(diffpid > 0 && WIFEXITED(st))) {
+		int tmp_rc = WEXITSTATUS(st);
+
+		if (tmp_rc > rc) {
+			rc = tmp_rc;
+		}
+	}
+	/* and after all, if we ignore the rcs just reset them to zero */
 	if (tst->ign_ret) {
 		rc = 0;
 	}
@@ -838,8 +860,6 @@ run_tst(struct clit_chld_s ctx[static 1], struct clit_tst_s tst[static 1])
 		close(ctx->pin);
 	}
 
-	/* now indicate we won't be reading stuff from now on */
-	close(ctx->pou);
 	/* also connect per's out end with stderr */
 	if (UNLIKELY(ctx->ptyp)) {
 #if !defined SPLICE_F_MOVE
