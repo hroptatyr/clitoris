@@ -179,8 +179,10 @@ init_diff(struct clit_chld_s ctx[static 1])
 	snprintf(expfn, sizeof(expfn), "hex output for FILE1 (%s)", ctx->fn1);
 	snprintf(actfn, sizeof(actfn), "hex output for FILE2 (%s)", ctx->fn2);
 	if (mkfifo(expfn, 0666) < 0) {
+		error("cannot create fifo `%s'", expfn);
 		goto out;
 	} else if (mkfifo(actfn, 0666) < 0) {
+		error("cannot create fifo `%s'", actfn);
 		goto out;
 	}
 
@@ -189,6 +191,7 @@ init_diff(struct clit_chld_s ctx[static 1])
 	case -1:
 		/* i am an error */
 		unblock_sigs();
+		error("vfork failed");
 		break;
 
 	case 0:;
