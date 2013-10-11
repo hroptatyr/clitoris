@@ -85,6 +85,9 @@ struct clit_buf_s {
 };
 
 struct clit_chld_s {
+	const char *df1_fn;
+	const char *df2_fn;
+
 	int fd_df1;
 	int fd_df2;
 	pid_t chld;
@@ -169,15 +172,16 @@ fini_chld(struct clit_chld_s UNUSED(ctx)[static 1])
 static int
 init_diff(struct clit_chld_s ctx[static 1])
 {
-	int p_exp[2];
-	int p_is[2];
-	pid_t diff;
+	static char expfn[PATH_MAX];
+	static char actfn[PATH_MAX];
+	pid_t diff = -1;
 
-	/* expected and is pipes for diff */
-	if (pipe(p_exp) < 0) {
-		return -1;
-	} else if (pipe(p_is) < 0) {
-		goto clo_exp;
+	snprintf(expfn, sizeof(expfn), "hex output for %s", ctx->df1_fn);
+	snprintf(actfn, sizeof(actfn), "hex output for %s", ctx->df2_fn);
+	if (mkfifo(expfn, 0666) < 0) {
+		goto out;
+	} else if (mkfifo(actfn, 0666) < 0) {
+		goto out;
 	}
 
 	block_sigs();
@@ -185,26 +189,17 @@ init_diff(struct clit_chld_s ctx[static 1])
 	case -1:
 		/* i am an error */
 		unblock_sigs();
-		goto clo;
+		break;
 
 	case 0:;
 		/* i am the child */
-		static char fa[64];
-		static char fb[64];
 		static char *const diff_opt[] = {
 			"diff",
-			"-u", "--label=expected", "--label=actual",
-			fa, fb, NULL,
+			"-u",
+			expfn, actfn, NULL,
 		};
 
 		unblock_sigs();
-
-		/* kick the write ends of our pipes */
-		close(p_exp[1]);
-		close(p_is[1]);
-
-		snprintf(fa, sizeof(fa), "/dev/fd/%d", *p_exp);
-		snprintf(fb, sizeof(fb), "/dev/fd/%d", *p_is);
 
 		execvp("diff", diff_opt);
 		error("execlp failed");
@@ -212,14 +207,15 @@ init_diff(struct clit_chld_s ctx[static 1])
 
 	default:;
 		/* i am the parent */
+		int expfd;
+		int actfd;
 
-		/* clean up descriptors */
-		close(*p_exp);
-		close(*p_is);
+		expfd = open(expfn, O_WRONLY);
+		actfd = open(actfn, O_WRONLY);
 
 		/* and put result descriptors in output args */
-		ctx->fd_df1 = p_exp[1];
-		ctx->fd_df2 = p_is[1];
+		ctx->fd_df1 = expfd;
+		ctx->fd_df2 = actfd;
 		ctx->chld = diff;
 
 		/* make out descriptors non-blocking */
@@ -229,14 +225,16 @@ init_diff(struct clit_chld_s ctx[static 1])
 		/* diff's stdout can just go straight there */
 		break;
 	}
-	return 0;
-clo:
-	close(p_is[0]);
-	close(p_is[1]);
-clo_exp:
-	close(p_exp[0]);
-	close(p_exp[1]);
-	return -1;
+out:
+	/* clean up our fifo files, let's hope there's no other files
+	 * with that name, innit? */
+	if (*expfn) {
+		(void)unlink(expfn);
+	}
+	if (*actfn) {
+		(void)unlink(actfn);
+	}
+	return diff;
 }
 
 static int
@@ -510,6 +508,9 @@ hxdiff(const char *file1, const char *file2)
 	}
 	fz2 = st.st_size;
 
+	/* assign file names (for init_diff) */
+	ctx->df1_fn = file1;
+	ctx->df2_fn = file2;
 	if (UNLIKELY(init_chld(ctx) < 0)) {
 		goto clo;
 	} else if (UNLIKELY(init_diff(ctx) < 0)) {
