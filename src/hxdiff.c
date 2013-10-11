@@ -169,6 +169,19 @@ fini_chld(struct clit_chld_s UNUSED(ctx)[static 1])
 	return 0;
 }
 
+static void
+mkfifofn(char *restrict buf, size_t bsz, const char *fn)
+{
+	static char i = '1';
+	const char *tmp;
+
+	if ((tmp = strrchr(fn, '/')) != NULL) {
+		fn = tmp + 1U;
+	}
+	snprintf(buf, bsz, "hex output for FILE%c (%s)", i++, fn);
+	return;
+}
+
 static int
 init_diff(struct clit_chld_s ctx[static 1])
 {
@@ -176,12 +189,12 @@ init_diff(struct clit_chld_s ctx[static 1])
 	static char actfn[PATH_MAX];
 	pid_t diff = -1;
 
-	snprintf(expfn, sizeof(expfn), "hex output for FILE1 (%s)", ctx->fn1);
-	snprintf(actfn, sizeof(actfn), "hex output for FILE2 (%s)", ctx->fn2);
-	if (mkfifo(expfn, 0666) < 0) {
+	if (mkfifofn(expfn, sizeof(expfn), ctx->fn1),
+	    mkfifo(expfn, 0666) < 0) {
 		error("cannot create fifo `%s'", expfn);
 		goto out;
-	} else if (mkfifo(actfn, 0666) < 0) {
+	} else if (mkfifofn(actfn, sizeof(actfn), ctx->fn2),
+		   mkfifo(actfn, 0666) < 0) {
 		error("cannot create fifo `%s'", actfn);
 		goto out;
 	}
