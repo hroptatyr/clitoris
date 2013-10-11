@@ -671,12 +671,14 @@ differ(struct clit_chld_s ctx[static 1], clit_bit_t exp)
 	}
 	snprintf(expfn, sizeof(expfn), "expected output (%s)", name);
 	if (mkfifo(expfn, 0666) < 0) {
+		error("cannot create fifo `%s'", expfn);
 		goto out;
 	}
 
 	/* always use the clitfile's name here */
 	snprintf(actfn, sizeof(actfn), "actual output (%s)", ctx->name);
 	if (mkfifo(actfn, 0666) < 0) {
+		error("cannot create fifo `%s'", actfn);
 		goto out;
 	}
 
@@ -685,6 +687,7 @@ differ(struct clit_chld_s ctx[static 1], clit_bit_t exp)
 	switch ((difftool = vfork())) {
 	case -1:
 		/* i am an error */
+		error("vfork for diff failed");
 		break;
 
 	case 0:;
