@@ -50,6 +50,7 @@
 #include <sys/wait.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/time.h>
 #include <string.h>
 #include <ctype.h>
 #include <errno.h>
@@ -614,6 +615,18 @@ xclosefrom(int fd)
 	return;
 }
 
+static void
+mkfifofn(char *restrict buf, size_t bsz, const char *key)
+{
+	struct timeval tv[1];
+
+	(void)gettimeofday(tv, NULL);
+	with (long unsigned int uniq = tv->tv_sec ^ tv->tv_usec) {
+		snprintf(buf, bsz, "%s output  %lx", key, uniq);
+	}
+	return;
+}
+
 static pid_t
 feeder(clit_bit_t exp, int expfd)
 {
@@ -660,24 +673,15 @@ differ(struct clit_chld_s ctx[static 1], clit_bit_t exp)
 #endif	/* !L_tmpnam */
 	static char expfn[PATH_MAX];
 	static char actfn[PATH_MAX];
-	const char *name = ctx->name;
 
 	assert(!clit_bit_fd_p(exp));
 
-	/* we want fifos for descriptors and buffers
-	 * and real file names for files */
-	if (clit_bit_fn_p(exp)) {
-		name = exp.d;
-	}
-	snprintf(expfn, sizeof(expfn), "expected output (%s)", name);
-	if (mkfifo(expfn, 0666) < 0) {
+	if (mkfifofn(expfn, sizeof(expfn), "expected"),
+	    mkfifo(expfn, 0666) < 0) {
 		error("cannot create fifo `%s'", expfn);
 		goto out;
-	}
-
-	/* always use the clitfile's name here */
-	snprintf(actfn, sizeof(actfn), "actual output (%s)", ctx->name);
-	if (mkfifo(actfn, 0666) < 0) {
+	} else if (mkfifofn(actfn, sizeof(actfn), "actual"),
+		   mkfifo(actfn, 0666) < 0) {
 		error("cannot create fifo `%s'", actfn);
 		goto out;
 	}
