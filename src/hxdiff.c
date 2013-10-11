@@ -85,11 +85,11 @@ struct clit_buf_s {
 };
 
 struct clit_chld_s {
-	const char *df1_fn;
-	const char *df2_fn;
+	const char *fn1;
+	const char *fn2;
 
-	int fd_df1;
-	int fd_df2;
+	int fd1;
+	int fd2;
 	pid_t chld;
 
 	unsigned int verbosep:1;
@@ -176,8 +176,8 @@ init_diff(struct clit_chld_s ctx[static 1])
 	static char actfn[PATH_MAX];
 	pid_t diff = -1;
 
-	snprintf(expfn, sizeof(expfn), "hex output for %s", ctx->df1_fn);
-	snprintf(actfn, sizeof(actfn), "hex output for %s", ctx->df2_fn);
+	snprintf(expfn, sizeof(expfn), "hex output for FILE1 (%s)", ctx->fn1);
+	snprintf(actfn, sizeof(actfn), "hex output for FILE2 (%s)", ctx->fn2);
 	if (mkfifo(expfn, 0666) < 0) {
 		goto out;
 	} else if (mkfifo(actfn, 0666) < 0) {
@@ -214,13 +214,13 @@ init_diff(struct clit_chld_s ctx[static 1])
 		actfd = open(actfn, O_WRONLY);
 
 		/* and put result descriptors in output args */
-		ctx->fd_df1 = expfd;
-		ctx->fd_df2 = actfd;
+		ctx->fd1 = expfd;
+		ctx->fd2 = actfd;
 		ctx->chld = diff;
 
 		/* make out descriptors non-blocking */
-		setsock_nonblock(ctx->fd_df1);		
-		setsock_nonblock(ctx->fd_df2);		
+		setsock_nonblock(ctx->fd1);
+		setsock_nonblock(ctx->fd2);
 
 		/* diff's stdout can just go straight there */
 		break;
@@ -449,10 +449,10 @@ fanout(struct clit_chld_s ctx[static 1], int f1, size_t z1, int f2, size_t z2)
 	struct fan_s fans[] = {
 		{
 			.f = f1,
-			.of = ctx->fd_df1,
+			.of = ctx->fd1,
 		}, {
 			.f = f2,
-			.of = ctx->fd_df2,
+			.of = ctx->fd2,
 		}
 	};
 	size_t tot1 = 0U;
@@ -509,8 +509,8 @@ hxdiff(const char *file1, const char *file2)
 	fz2 = st.st_size;
 
 	/* assign file names (for init_diff) */
-	ctx->df1_fn = file1;
-	ctx->df2_fn = file2;
+	ctx->fn1 = file1;
+	ctx->fn2 = file2;
 	if (UNLIKELY(init_chld(ctx) < 0)) {
 		goto clo;
 	} else if (UNLIKELY(init_diff(ctx) < 0)) {
