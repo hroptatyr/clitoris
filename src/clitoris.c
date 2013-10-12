@@ -649,6 +649,7 @@ feeder(clit_bit_t exp, int expfd)
 				exp.z = 0;
 			}
 		}
+
 		/* we're done */
 		close(expfd);
 
@@ -676,8 +677,14 @@ differ(struct clit_chld_s ctx[static 1], clit_bit_t exp)
 
 	assert(!clit_bit_fd_p(exp));
 
-	if (mkfifofn(expfn, sizeof(expfn), "expected"),
-	    mkfifo(expfn, 0666) < 0) {
+	if (clit_bit_fn_p(exp) &&
+	    (strlen(exp.d) >= sizeof(expfn) ||
+	     memcpy(expfn, exp.d, strlen(exp.d)) == NULL)) {
+		error("cannot prepare in file `%s'", exp.d);
+		goto out;
+	} else if (!clit_bit_fn_p(exp) &&
+		   (mkfifofn(expfn, sizeof(expfn), "expected"),
+		    mkfifo(expfn, 0666) < 0)) {
 		error("cannot create fifo `%s'", expfn);
 		goto out;
 	} else if (mkfifofn(actfn, sizeof(actfn), "actual"),
@@ -755,7 +762,7 @@ differ(struct clit_chld_s ctx[static 1], clit_bit_t exp)
 
 	unblock_sigs();
 out:
-	if (*expfn) {
+	if (*expfn && !clit_bit_fn_p(exp)) {
 		unlink(expfn);
 	}
 	if (*actfn) {
