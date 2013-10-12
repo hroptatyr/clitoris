@@ -85,8 +85,11 @@ struct clit_buf_s {
 };
 
 struct clit_chld_s {
-	int fd_df1;
-	int fd_df2;
+	const char *fn1;
+	const char *fn2;
+
+	int fd1;
+	int fd2;
 	pid_t chld;
 
 	unsigned int verbosep:1;
@@ -166,18 +169,34 @@ fini_chld(struct clit_chld_s UNUSED(ctx)[static 1])
 	return 0;
 }
 
+static void
+mkfifofn(char *restrict buf, size_t bsz, const char *fn)
+{
+	static char i = '1';
+	const char *tmp;
+
+	if ((tmp = strrchr(fn, '/')) != NULL) {
+		fn = tmp + 1U;
+	}
+	snprintf(buf, bsz, "hex output for FILE%c (%s)", i++, fn);
+	return;
+}
+
 static int
 init_diff(struct clit_chld_s ctx[static 1])
 {
-	int p_exp[2];
-	int p_is[2];
-	pid_t diff;
+	static char expfn[PATH_MAX];
+	static char actfn[PATH_MAX];
+	pid_t diff = -1;
 
-	/* expected and is pipes for diff */
-	if (pipe(p_exp) < 0) {
-		return -1;
-	} else if (pipe(p_is) < 0) {
-		goto clo_exp;
+	if (mkfifofn(expfn, sizeof(expfn), ctx->fn1),
+	    mkfifo(expfn, 0666) < 0) {
+		error("cannot create fifo `%s'", expfn);
+		goto out;
+	} else if (mkfifofn(actfn, sizeof(actfn), ctx->fn2),
+		   mkfifo(actfn, 0666) < 0) {
+		error("cannot create fifo `%s'", actfn);
+		goto out;
 	}
 
 	block_sigs();
@@ -185,26 +204,18 @@ init_diff(struct clit_chld_s ctx[static 1])
 	case -1:
 		/* i am an error */
 		unblock_sigs();
-		goto clo;
+		error("vfork failed");
+		break;
 
 	case 0:;
 		/* i am the child */
-		static char fa[64];
-		static char fb[64];
 		static char *const diff_opt[] = {
 			"diff",
-			"-u", "--label=expected", "--label=actual",
-			fa, fb, NULL,
+			"-u",
+			expfn, actfn, NULL,
 		};
 
 		unblock_sigs();
-
-		/* kick the write ends of our pipes */
-		close(p_exp[1]);
-		close(p_is[1]);
-
-		snprintf(fa, sizeof(fa), "/dev/fd/%d", *p_exp);
-		snprintf(fb, sizeof(fb), "/dev/fd/%d", *p_is);
 
 		execvp("diff", diff_opt);
 		error("execlp failed");
@@ -212,31 +223,34 @@ init_diff(struct clit_chld_s ctx[static 1])
 
 	default:;
 		/* i am the parent */
+		int expfd;
+		int actfd;
 
-		/* clean up descriptors */
-		close(*p_exp);
-		close(*p_is);
+		expfd = open(expfn, O_WRONLY);
+		actfd = open(actfn, O_WRONLY);
 
 		/* and put result descriptors in output args */
-		ctx->fd_df1 = p_exp[1];
-		ctx->fd_df2 = p_is[1];
+		ctx->fd1 = expfd;
+		ctx->fd2 = actfd;
 		ctx->chld = diff;
 
 		/* make out descriptors non-blocking */
-		setsock_nonblock(ctx->fd_df1);		
-		setsock_nonblock(ctx->fd_df2);		
+		setsock_nonblock(ctx->fd1);
+		setsock_nonblock(ctx->fd2);
 
 		/* diff's stdout can just go straight there */
 		break;
 	}
-	return 0;
-clo:
-	close(p_is[0]);
-	close(p_is[1]);
-clo_exp:
-	close(p_exp[0]);
-	close(p_exp[1]);
-	return -1;
+out:
+	/* clean up our fifo files, let's hope there's no other files
+	 * with that name, innit? */
+	if (*expfn) {
+		(void)unlink(expfn);
+	}
+	if (*actfn) {
+		(void)unlink(actfn);
+	}
+	return diff;
 }
 
 static int
@@ -451,10 +465,10 @@ fanout(struct clit_chld_s ctx[static 1], int f1, size_t z1, int f2, size_t z2)
 	struct fan_s fans[] = {
 		{
 			.f = f1,
-			.of = ctx->fd_df1,
+			.of = ctx->fd1,
 		}, {
 			.f = f2,
-			.of = ctx->fd_df2,
+			.of = ctx->fd2,
 		}
 	};
 	size_t tot1 = 0U;
@@ -510,6 +524,9 @@ hxdiff(const char *file1, const char *file2)
 	}
 	fz2 = st.st_size;
 
+	/* assign file names (for init_diff) */
+	ctx->fn1 = file1;
+	ctx->fn2 = file2;
 	if (UNLIKELY(init_chld(ctx) < 0)) {
 		goto clo;
 	} else if (UNLIKELY(init_diff(ctx) < 0)) {
