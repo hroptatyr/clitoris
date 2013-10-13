@@ -668,12 +668,12 @@ feeder(clit_bit_t exp, int expfd)
 static pid_t
 differ(struct clit_chld_s ctx[static 1], clit_bit_t exp)
 {
-	pid_t difftool;
 #if !defined L_tmpnam
 # define L_tmpnam	(PATH_MAX)
 #endif	/* !L_tmpnam */
 	static char expfn[PATH_MAX];
 	static char actfn[PATH_MAX];
+	pid_t difftool = -1;
 
 	assert(!clit_bit_fd_p(exp));
 
