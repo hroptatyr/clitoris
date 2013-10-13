@@ -913,6 +913,7 @@ run_tst(struct clit_chld_s ctx[static 1], struct clit_tst_s tst[static 1])
 		rc = 0;
 	}
 
+#if defined HAVE_PTY_H
 	if (UNLIKELY(ctx->ptyp)) {
 		/* also close child's stdin here */
 		close(ctx->pin);
@@ -929,6 +930,7 @@ run_tst(struct clit_chld_s ctx[static 1], struct clit_tst_s tst[static 1])
 			      4096U, SPLICE_F_MOVE)) == 4096U;);
 		close(ctx->per);
 	}
+#endif	/* HAVE_PTY_H */
 	return rc;
 }
 
