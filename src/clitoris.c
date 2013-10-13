@@ -500,7 +500,8 @@ find_tst(struct clit_tst_s tst[static 1], const char *bp, size_t bz)
 			if ((fn = bufexp(bp + 2, outz - 2U - 1U)) != NULL) {
 				tst->out = clit_make_fn(fn);
 			} else {
-				tst->out = (clit_bit_t){0U};
+				error("expansion failed");
+				goto fail;
 			}
 		} else {
 			tst->out = (clit_bit_t){.z = outz, bp};
