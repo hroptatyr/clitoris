@@ -109,7 +109,7 @@ struct clit_chld_s {
 	pid_t diff;
 	pid_t feed;
 
-	const char *name;
+	unsigned int test_id;
 
 	unsigned int verbosep:1;
 	unsigned int ptyp:1;
@@ -617,14 +617,9 @@ xclosefrom(int fd)
 }
 
 static void
-mkfifofn(char *restrict buf, size_t bsz, const char *key)
+mkfifofn(char *restrict buf, size_t bsz, const char *key, unsigned int tid)
 {
-	struct timeval tv[1];
-
-	(void)gettimeofday(tv, NULL);
-	with (long unsigned int uniq = tv->tv_sec ^ tv->tv_usec) {
-		snprintf(buf, bsz, "%s output  %lx", key, uniq);
-	}
+	snprintf(buf, bsz, "%s output  %x", key, tid);
 	return;
 }
 
@@ -684,11 +679,11 @@ differ(struct clit_chld_s ctx[static 1], clit_bit_t exp)
 		error("cannot prepare in file `%s'", exp.d);
 		goto out;
 	} else if (!clit_bit_fn_p(exp) &&
-		   (mkfifofn(expfn, sizeof(expfn), "expected"),
+		   (mkfifofn(expfn, sizeof(expfn), "expected", ctx->test_id),
 		    mkfifo(expfn, 0666) < 0)) {
 		error("cannot create fifo `%s'", expfn);
 		goto out;
-	} else if (mkfifofn(actfn, sizeof(actfn), "actual"),
+	} else if (mkfifofn(actfn, sizeof(actfn), "actual", ctx->test_id),
 		   mkfifo(actfn, 0666) < 0) {
 		error("cannot create fifo `%s'", actfn);
 		goto out;
@@ -728,14 +723,15 @@ differ(struct clit_chld_s ctx[static 1], clit_bit_t exp)
 
 	default:;
 		/* i am the parent */
+		static const int ofl = O_WRONLY;
 		int expfd = -1;
 		int actfd = -1;
 
 		/* clean up descriptors */
 		if (!clit_bit_fn_p(exp) &&
-		    (expfd = open(expfn, O_WRONLY)) < 0) {
+		    (expfd = open(expfn, ofl, 0666)) < 0) {
 			goto clobrk;
-		} else if ((actfd = open(actfn, O_WRONLY)) < 0) {
+		} else if ((actfd = open(actfn, ofl, 0666)) < 0) {
 			goto clobrk;
 		}
 
@@ -779,6 +775,12 @@ init_tst(struct clit_chld_s ctx[static 1], struct clit_tst_s tst[static 1])
 	int pty;
 	int pin[2];
 	int per[2];
+
+	/* obtain a test id */
+	with (struct timeval tv[1]) {
+		(void)gettimeofday(tv, NULL);
+		ctx->test_id = (unsigned int)(tv->tv_sec ^ tv->tv_usec);
+	}
 
 	if (0) {
 		;
