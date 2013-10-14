@@ -73,7 +73,6 @@ TESTS += ignore_02.clit
 TESTS += ignore_03.clit
 TESTS += ignore_04.clit
 TESTS += ignore_05.clit
-TESTS += ignore_06.clit
 
 XFAIL_TESTS += keep-going_01.clit
 XFAIL_TESTS += keep-going_02.clit

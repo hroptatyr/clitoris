@@ -297,10 +297,10 @@ pfork(int *pty)
 }
 #else  /* !HAVE_PTY_H */
 static pid_t
-pfork(int *pty __attribute__((unused)))
+pfork(int *pty)
 {
 	fputs("pseudo-tty not supported\n", stderr);
-	return -1;
+	return *pty = -1;
 }
 #endif	/* HAVE_PTY_H */
 
@@ -500,7 +500,8 @@ find_tst(struct clit_tst_s tst[static 1], const char *bp, size_t bz)
 			if ((fn = bufexp(bp + 2, outz - 2U - 1U)) != NULL) {
 				tst->out = clit_make_fn(fn);
 			} else {
-				tst->out = (clit_bit_t){0U};
+				error("expansion failed");
+				goto fail;
 			}
 		} else {
 			tst->out = (clit_bit_t){.z = outz, bp};
@@ -668,12 +669,12 @@ feeder(clit_bit_t exp, int expfd)
 static pid_t
 differ(struct clit_chld_s ctx[static 1], clit_bit_t exp)
 {
-	pid_t difftool;
 #if !defined L_tmpnam
 # define L_tmpnam	(PATH_MAX)
 #endif	/* !L_tmpnam */
 	static char expfn[PATH_MAX];
 	static char actfn[PATH_MAX];
+	pid_t difftool = -1;
 
 	assert(!clit_bit_fd_p(exp));
 
@@ -912,6 +913,7 @@ run_tst(struct clit_chld_s ctx[static 1], struct clit_tst_s tst[static 1])
 		rc = 0;
 	}
 
+#if defined HAVE_PTY_H
 	if (UNLIKELY(ctx->ptyp)) {
 		/* also close child's stdin here */
 		close(ctx->pin);
@@ -928,6 +930,7 @@ run_tst(struct clit_chld_s ctx[static 1], struct clit_tst_s tst[static 1])
 			      4096U, SPLICE_F_MOVE)) == 4096U;);
 		close(ctx->per);
 	}
+#endif	/* HAVE_PTY_H */
 	return rc;
 }
 
