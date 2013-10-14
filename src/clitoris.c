@@ -723,14 +723,15 @@ differ(struct clit_chld_s ctx[static 1], clit_bit_t exp)
 
 	default:;
 		/* i am the parent */
+		static const int ofl = O_WRONLY;
 		int expfd = -1;
 		int actfd = -1;
 
 		/* clean up descriptors */
 		if (!clit_bit_fn_p(exp) &&
-		    (expfd = open(expfn, O_WRONLY)) < 0) {
+		    (expfd = open(expfn, ofl, 0666)) < 0) {
 			goto clobrk;
-		} else if ((actfd = open(actfn, O_WRONLY)) < 0) {
+		} else if ((actfd = open(actfn, ofl, 0666)) < 0) {
 			goto clobrk;
 		}
 
