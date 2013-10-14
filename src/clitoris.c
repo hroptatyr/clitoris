@@ -674,8 +674,7 @@ differ(struct clit_chld_s ctx[static 1], clit_bit_t exp)
 	assert(!clit_bit_fd_p(exp));
 
 	if (clit_bit_fn_p(exp) &&
-	    (strlen(exp.d) >= sizeof(expfn) ||
-	     memcpy(expfn, exp.d, strlen(exp.d)) == NULL)) {
+	    (strlen(exp.d) >= sizeof(expfn) || strcpy(expfn, exp.d) == NULL)) {
 		error("cannot prepare in file `%s'", exp.d);
 		goto out;
 	} else if (!clit_bit_fn_p(exp) &&
