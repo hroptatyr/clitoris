@@ -53,7 +53,7 @@ TESTS += vars_02.clit
 #TESTS += vars_03.clit
 #TESTS += vars_04.clit
 
-CLIT_LOG_COMPILER += --timeout 2
+CLIT_LOG_COMPILER += --timeout 3
 TESTS += timeo_01.clit
 XFAIL_TESTS += timeo_02.clit
 XFAIL_TESTS += timeo_03.clit
