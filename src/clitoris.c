@@ -362,11 +362,12 @@ find_cmd(const char *bp, size_t bz)
 
 eof:
 	/* massage tok so that it starts on a non-space and ends on one */
-	for (; *tok.d == ' ' || *tok.d == '\t'; tok.d++, tok.z--);
+	for (; tok.z && (*tok.d == ' ' || *tok.d == '\t'); tok.d++, tok.z--);
 	for (;
 	     tok.z && (tok.d[tok.z - 1] == ' ' || tok.d[tok.z - 1] == '\t');
 	     tok.z--);
-	if ((*tok.d == '\'' || *tok.d == '"') && tok.d[tok.z - 1] == *tok.d) {
+	if (tok.z &&
+	    (*tok.d == '\'' || *tok.d == '"') && tok.d[tok.z - 1] == *tok.d) {
 		tok.d++;
 		tok.z -= 2U;
 	}
