@@ -38,6 +38,7 @@
 # include "config.h"
 #endif	/* HAVE_CONFIG_H */
 #define _ALL_SOURCE
+#define _NETBSD_SOURCE
 #include <unistd.h>
 #include <stdarg.h>
 #include <stdlib.h>
