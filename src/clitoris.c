@@ -1148,6 +1148,8 @@ main(int argc, char *argv[])
 	}
 	if (argi->diff_given) {
 		cmd_diff = argi->diff_arg;
+	} else if (getenv("DIFF") != NULL) {
+		cmd_diff = getenv("DIFF");
 	}
 
 	/* prepend our current directory and our argv[0] directory */
