@@ -147,6 +147,9 @@ struct clit_tst_s {
 static sigset_t fatal_signal_set[1];
 static sigset_t empty_signal_set[1];
 
+static const char dflt_diff[] = "diff";
+static const char *cmd_diff = dflt_diff;
+
 
 static void
 __attribute__((format(printf, 1, 2)))
@@ -719,7 +722,7 @@ differ(struct clit_chld_s ctx[static 1], clit_bit_t exp)
 		/* close all other descriptors */
 		xclosefrom(STDOUT_FILENO + 1);
 
-		execvp("diff", diff_opt);
+		execvp(cmd_diff, diff_opt);
 		error("execlp failed");
 		_exit(EXIT_FAILURE);
 
@@ -1142,6 +1145,9 @@ main(int argc, char *argv[])
 	}
 	if (argi->keep_going_given) {
 		keep_going_p = 1;
+	}
+	if (argi->diff_given) {
+		cmd_diff = argi->diff_arg;
 	}
 
 	/* prepend our current directory and our argv[0] directory */
