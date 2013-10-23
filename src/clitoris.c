@@ -988,11 +988,14 @@ prepend_path(const char *p)
 	if (UNLIKELY(pp < paths)) {
 		/* awww, not enough space, is there */
 		off_t ppoff = paths + pathz - pp;
+		size_t newsz = ((pathz + pz + 1U) / 256U + 1) * 256U;
 
-		pathz = ((pathz + pz + 1U) / 256U + 1) * 256U;
-		paths = realloc(paths, pathz);
+		paths = realloc(paths, newsz);
+		/* memmove to the back */
+		memmove(paths + (newsz - pathz), paths, pathz);
 		/* recalc paths pointer */
 		pp = paths + ppoff;
+		pathz = newsz;
 	}
 
 	/* actually prepend now */
