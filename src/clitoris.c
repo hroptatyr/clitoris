@@ -45,6 +45,7 @@
 #include <stdbool.h>
 #include <limits.h>
 #include <fcntl.h>
+#include <signal.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
