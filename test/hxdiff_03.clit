@@ -1,6 +1,6 @@
 #!/usr/bin/clitoris ## -*- shell-script -*-
 
-$ ignore dd if=/dev/zero of=big_chunk.bin bs=4k count=1k
+$ ignore dd if=/dev/zero of=big_chunk.bin bs=4k count=4
 $ hxdiff "big_chunk.bin" "big_chunk.bin"
 $ ignore rm -- "big_chunk.bin"
 $
