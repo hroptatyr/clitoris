@@ -38,3 +38,7 @@ option "timeout" -
 option "keep-going" k
 	"Don't break on the first failure or differing output"
 	optional
+
+option "diff" -
+	"Use specified diff command instead of the one in PATH."
+	optional string typestr="CMD"
