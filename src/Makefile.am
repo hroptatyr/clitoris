@@ -36,7 +36,7 @@ clitoris_LDADD = libclit.a
 if HAVE_PTY_H
 clitoris_LDADD += -lutil
 endif  HAVE_PTY_H
-BUILT_SOURCES += clitoris.x clitoris.xh
+BUILT_SOURCES += clitoris.yucc
 
 bin_PROGRAMS += shack
 shack_LDADD = libclit.a
@@ -47,11 +47,17 @@ hxdiff_LDADD = libclit.a
 BUILT_SOURCES += hxdiff.x hxdiff.xh
 
 
+SUFFIXES = .yuck .yucc .sa
+
 analysis: $(bin_PROGRAMS:%=%.sa)
 
 ## generate version.c from .c.in
 version.c: version.c.in $(top_builddir)/version.mk
 	sed -e 's,[@]VERSION[@],$(VERSION),g' <$(srcdir)/$@.in >$@
+
+.yuck.yucc:
+	$(AM_V_GEN) PATH=$(top_builddir)/build-aux:"$${PATH}" \
+		yuck$(EXEEXT) gen $< > $@ || { rm -f -- $@; false; }
 
 ## ggo rule
 %.x %.xh: %.ggo
