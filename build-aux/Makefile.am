@@ -6,12 +6,14 @@ AM_CPPFLAGS = -D_POSIX_C_SOURCE=200112L -D_XOPEN_SOURCE=700 -D_BSD_SOURCE
 
 noinst_PROGRAMS =
 BUILT_SOURCES =
+CLEANFILES = $(BUILT_SOURCES)
 
 if !HAVE_YUCK
 noinst_PROGRAMS += yuck-bootstrap
 yuck_bootstrap_SOURCES = yuck.c
 yuck_bootstrap_CPPFLAGS = $(AM_CPPFLAGS)
 yuck_bootstrap_CPPFLAGS += -DBOOTSTRAP
+CLEANFILES += yuck.m4i
 
 noinst_PROGRAMS += yuck
 yuck_SOURCES = yuck.c yuck.yuck
