@@ -1,0 +1,3 @@
+Usage: shack [OPTION]... FILE [ACCEPTED_SHA]...
+
+Compute the sha sum of FILE and compare with ACCEPTED_SHAs.

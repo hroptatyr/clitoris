@@ -514,32 +514,23 @@ nibble:
 }
 
 
-#if defined __INTEL_COMPILER
-# pragma warning (disable:593)
-# pragma warning (disable:181)
-#endif	/* __INTEL_COMPILER */
-#include "shack.xh"
-#include "shack.x"
-#if defined __INTEL_COMPILER
-# pragma warning (default:593)
-# pragma warning (default:181)
-#endif	/* __INTEL_COMPILER */
+#include "shack.yucc"
 
 int
 main(int argc, char *argv[])
 {
-	struct gengetopt_args_info argi[1];
+	struct yuck_s argi[1];
 	int rc = 99;
 
-	if (cmdline_parser(argc, argv, argi)) {
+	if (yuck_parse(argi, argc, argv)) {
 		goto out;
-	} else if (argi->inputs_num < 1U) {
-		print_help_common();
+	} else if (argi->nargs < 1U) {
+		yuck_auto_help(YUCK_NONE);
 		goto out;
 	}
 
 	pgsz = sysconf(_SC_PAGESIZE);
-	with (const char *fn = argi->inputs[0U]) {
+	with (const char *fn = argi->args[0U]) {
 		/* compute the sha of FN */
 		sha_t ref;
 
@@ -550,8 +541,8 @@ main(int argc, char *argv[])
 
 		/* default for now is ret code 1 */
 		rc = 1;
-		for (unsigned int i = 1U; i < argi->inputs_num; i++) {
-			const char *arg = argi->inputs[i];
+		for (size_t i = 1U; i < argi->nargs; i++) {
+			const char *arg = argi->args[i];
 			sha_t x = str_to_sha(arg);
 
 			if (sha_eqp(ref, x)) {
@@ -571,7 +562,7 @@ main(int argc, char *argv[])
 	}
 
 out:
-	cmdline_parser_free(argi);
+	yuck_free(argi);
 	/* never succeed */
 	return rc;
 }

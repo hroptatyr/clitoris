@@ -6,6 +6,7 @@ LC_ALL = C
 ACLOCAL_AMFLAGS = -I m4
 
 SUBDIRS =
+SUBDIRS += build-aux
 SUBDIRS += src
 SUBDIRS += test
 

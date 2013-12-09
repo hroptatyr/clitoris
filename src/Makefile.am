@@ -23,11 +23,6 @@ EXTRA_DIST += version.c.in
 noinst_LIBRARIES += libclit.a
 libclit_a_SOURCES = version.c version.h
 
-if NEED_GETOPT_H
-BUILT_SOURCES += getopt.h
-endif  NEED_GETOPT_H
-EXTRA_DIST += getopt.h.in
-
 bin_PROGRAMS += clitoris
 clitoris_CPPFLAGS = $(AM_CPPFLAGS)
 clitoris_CPPFLAGS += -D_GNU_SOURCE
@@ -36,16 +31,18 @@ clitoris_LDADD = libclit.a
 if HAVE_PTY_H
 clitoris_LDADD += -lutil
 endif  HAVE_PTY_H
-BUILT_SOURCES += clitoris.x clitoris.xh
+BUILT_SOURCES += clitoris.yucc
 
 bin_PROGRAMS += shack
 shack_LDADD = libclit.a
-BUILT_SOURCES += shack.x shack.xh
+BUILT_SOURCES += shack.yucc
 
 bin_PROGRAMS += hxdiff
 hxdiff_LDADD = libclit.a
-BUILT_SOURCES += hxdiff.x hxdiff.xh
+BUILT_SOURCES += hxdiff.yucc
 
+
+SUFFIXES = .yuck .yucc .sa
 
 analysis: $(bin_PROGRAMS:%=%.sa)
 
@@ -53,19 +50,9 @@ analysis: $(bin_PROGRAMS:%=%.sa)
 version.c: version.c.in $(top_builddir)/version.mk
 	sed -e 's,[@]VERSION[@],$(VERSION),g' <$(srcdir)/$@.in >$@
 
-## ggo rule
-%.x %.xh: %.ggo
-	$(AM_V_GEN) gengetopt -l -G -c x -H xh -i $< -F $* \
-	&& sed \
-	  -e 's,config.h,version.h,g' \
-	  -e 's,\(.*\)_PARSER_VERSION VERSION,\1_PARSER_VERSION $(PACKAGE)_version_string,g' \
-	  $*.xh >$*.xh-t \
-	&& mv $*.xh-t $*.xh
-
-## for AIX that doesn't ship a getopt.h
-getopt.h: $(srcdir)/getopt.h.in
-	$(AM_V_GEN) cp $(srcdir)/getopt.h.in $@
-
+.yuck.yucc:
+	$(AM_V_GEN) PATH=$(top_builddir)/build-aux:"$${PATH}" \
+		yuck$(EXEEXT) gen $< > $@ || { rm -f -- $@; false; }
 
 ## for dist or dist check we need binaries, so help2man can work
 dist-hook: $(bin_PROGRAMS)
