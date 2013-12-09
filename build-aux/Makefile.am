@@ -7,6 +7,7 @@ AM_CPPFLAGS = -D_POSIX_C_SOURCE=200112L -D_XOPEN_SOURCE=700 -D_BSD_SOURCE
 noinst_PROGRAMS =
 BUILT_SOURCES =
 
+if !HAVE_YUCK
 noinst_PROGRAMS += yuck-bootstrap
 yuck_bootstrap_SOURCES = yuck.c
 yuck_bootstrap_CPPFLAGS = $(AM_CPPFLAGS)
@@ -19,6 +20,7 @@ yuck_SOURCES += yuck-coru.m4c yuck-coru.m4h
 yuck_CPPFLAGS = $(AM_CPPFLAGS)
 yuck_CPPFLAGS += -DYUCK_TEMPLATE_PATH='"$(abs_srcdir)"'
 BUILT_SOURCES += yuck.yucc
+endif  !HAVE_YUCK
 
 
 ## yuck rules
