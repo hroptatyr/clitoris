@@ -59,15 +59,6 @@ version.c: version.c.in $(top_builddir)/version.mk
 	$(AM_V_GEN) PATH=$(top_builddir)/build-aux:"$${PATH}" \
 		yuck$(EXEEXT) gen $< > $@ || { rm -f -- $@; false; }
 
-## ggo rule
-%.x %.xh: %.ggo
-	$(AM_V_GEN) gengetopt -l -G -c x -H xh -i $< -F $* \
-	&& sed \
-	  -e 's,config.h,version.h,g' \
-	  -e 's,\(.*\)_PARSER_VERSION VERSION,\1_PARSER_VERSION $(PACKAGE)_version_string,g' \
-	  $*.xh >$*.xh-t \
-	&& mv $*.xh-t $*.xh
-
 ## for AIX that doesn't ship a getopt.h
 getopt.h: $(srcdir)/getopt.h.in
 	$(AM_V_GEN) cp $(srcdir)/getopt.h.in $@
