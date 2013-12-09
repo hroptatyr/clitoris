@@ -1,5 +1,0 @@
-args "--unamed-opts --long-help --no-handle-error"
-package "shack"
-usage "shack [OPTION]... FILE [ACCEPTED_SHA]..."
-description "Compute the sha sum of FILE and compare with ACCEPTED_SHAs."
-

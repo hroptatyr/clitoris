@@ -40,7 +40,7 @@ BUILT_SOURCES += clitoris.yucc
 
 bin_PROGRAMS += shack
 shack_LDADD = libclit.a
-BUILT_SOURCES += shack.x shack.xh
+BUILT_SOURCES += shack.yucc
 
 bin_PROGRAMS += hxdiff
 hxdiff_LDADD = libclit.a
