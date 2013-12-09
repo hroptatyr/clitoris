@@ -552,38 +552,29 @@ out:
 }
 
 
-#if defined __INTEL_COMPILER
-# pragma warning (disable:593)
-# pragma warning (disable:181)
-#endif	/* __INTEL_COMPILER */
-#include "hxdiff.xh"
-#include "hxdiff.x"
-#if defined __INTEL_COMPILER
-# pragma warning (default:593)
-# pragma warning (default:181)
-#endif	/* __INTEL_COMPILER */
+#include "hxdiff.yucc"
 
 int
 main(int argc, char *argv[])
 {
-	struct gengetopt_args_info argi[1];
+	struct yuck_s argi[1];
 	int rc = 99;
 
-	if (cmdline_parser(argc, argv, argi)) {
+	if (yuck_parse(argi, argc, argv)) {
 		goto out;
-	} else if (argi->inputs_num != 2U) {
-		print_help_common();
+	} else if (argi->nargs != 2U) {
+		yuck_auto_help(YUCK_NONE);
 		goto out;
 	}
 
-	with (const char *f1 = argi->inputs[0U], *f2 = argi->inputs[1U]) {
+	with (const char *f1 = argi->args[0U], *f2 = argi->args[1U]) {
 		if ((rc = hxdiff(f1, f2)) < 0) {
 			rc = 99;
 		}
 	}
 
 out:
-	cmdline_parser_free(argi);
+	yuck_free(argi);
 	return rc;
 }
 

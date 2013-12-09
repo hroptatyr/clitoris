@@ -44,7 +44,7 @@ BUILT_SOURCES += shack.x shack.xh
 
 bin_PROGRAMS += hxdiff
 hxdiff_LDADD = libclit.a
-BUILT_SOURCES += hxdiff.x hxdiff.xh
+BUILT_SOURCES += hxdiff.yucc
 
 
 SUFFIXES = .yuck .yucc .sa
