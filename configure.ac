@@ -60,7 +60,7 @@ echo
 echo "Build summary"
 echo "============="
 echo
-echo "[x] clitoris"
+echo "[[x]] clitoris"
 echo
 
 dnl configure.ac ends here
