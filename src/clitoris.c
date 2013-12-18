@@ -37,8 +37,6 @@
 #if defined HAVE_CONFIG_H
 # include "config.h"
 #endif	/* HAVE_CONFIG_H */
-#define _ALL_SOURCE
-#define _NETBSD_SOURCE
 #include <unistd.h>
 #include <stdarg.h>
 #include <stdlib.h>
@@ -1103,13 +1101,13 @@ out:
 int
 main(int argc, char *argv[])
 {
-	struct yuck_s argi[1U];
+	yuck_t argi[1U];
 	int rc = 99;
 
 	if (yuck_parse(argi, argc, argv)) {
 		goto out;
 	} else if (argi->nargs != 1U) {
-		yuck_auto_help(YUCK_NONE);
+		yuck_auto_help(argi);
 		goto out;
 	}
 
