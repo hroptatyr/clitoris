@@ -51,6 +51,7 @@ AM_CONDITIONAL([HAVE_PTY_H], [test "${ac_cv_header_pty_h}" = "yes"])
 AC_CONFIG_FILES([Makefile])
 AC_CONFIG_FILES([build-aux/Makefile])
 AC_CONFIG_FILES([src/Makefile])
+AC_CONFIG_FILES([info/Makefile])
 AC_CONFIG_FILES([test/Makefile])
 AC_OUTPUT
 

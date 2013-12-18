@@ -8,6 +8,7 @@ ACLOCAL_AMFLAGS = -I m4
 SUBDIRS =
 SUBDIRS += build-aux
 SUBDIRS += src
+SUBDIRS += info
 SUBDIRS += test
 
 EXTRA_DIST =
