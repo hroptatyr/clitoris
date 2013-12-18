@@ -19,6 +19,7 @@ noinst_PROGRAMS += yuck
 yuck_SOURCES = yuck.c yuck.yuck
 yuck_SOURCES += yuck.m4
 yuck_SOURCES += yuck-coru.m4c yuck-coru.m4h
+yuck_SOURCES += yuck.m4man
 yuck_CPPFLAGS = $(AM_CPPFLAGS)
 yuck_CPPFLAGS += -DYUCK_TEMPLATE_PATH='"$(abs_srcdir)"'
 BUILT_SOURCES += yuck.yucc
