@@ -1,5 +1,4 @@
+#include "config.h"
 #include "version.h"
 
-#define VERSION "@VERSION@"
-
-const char clitoris_version_string[] = VERSION;
+const char clitoris_version_string[] = PACKAGE " @VERSION@";
