@@ -43,12 +43,14 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
+#include <strings.h>
 #include <assert.h>
 #include <errno.h>
 #include <ctype.h>
 #include <fcntl.h>
 #include <sys/wait.h>
 #include <sys/stat.h>
+#include <time.h>
 
 #if !defined LIKELY
 # define LIKELY(_x)	__builtin_expect((_x), 1)
@@ -71,6 +73,13 @@
 	for (args, *paste(__ep, __LINE__) = (void*)1;			\
 	     paste(__ep, __LINE__); paste(__ep, __LINE__) = 0)
 #endif	/* !with */
+
+#if !defined HAVE_GETLINE && !defined HAVE_FGETLN
+/* as a service to people including this file in their project
+ * but who might not necessarily run the corresponding AC_CHECK_FUNS
+ * we assume that a getline() is available. */
+# define HAVE_GETLINE	1
+#endif	/* !HAVE_GETLINE && !HAVE_FGETLN */
 
 struct usg_s {
 	char *umb;
@@ -263,7 +272,7 @@ bbuf_cat(bbuf_t b[static 1U], const char *str, size_t ssz)
 
 static void yield_usg(const struct usg_s *arg);
 static void yield_opt(const struct opt_s *arg);
-static void yield_inter(bbuf_t x[static 1U]);
+static void yield_inter(const bbuf_t x[static 1U]);
 
 #define DEBUG(args...)
 
@@ -305,6 +314,11 @@ usagep(const char *line, size_t llen)
 			cur_usg_ylddp = true;
 		}
 		return 0;
+	} else if (!cur_usg_ylddp) {
+		yield_usg(&cur_usg);
+		/* reset */
+		memset(&cur_usg, 0, sizeof(cur_usg));
+		desc->z = 0U;
 	}
 	/* overread whitespace then */
 	for (sp = line + sizeof("usage:") - 1; sp < ep && isspace(*sp); sp++);
@@ -425,8 +439,12 @@ yield:
 		/* start over with the new option */
 		sp++;
 		cur_opt.sopt = sopt;
-		if (isspace(*sp)) {
+		if (*sp == '\0') {
+			/* just the short option then innit? */
+			return 1;
+		} else if (isspace(*sp)) {
 			/* no arg name, no longopt */
+			;
 		} else if (*sp == '-') {
 			/* must be a --long now, maybe */
 			sp++;
@@ -443,6 +461,18 @@ yield:
 			}
 			for (ap = sp; sp < ep && isdashdash(*sp); sp++);
 			cur_opt.larg = bbuf_cpy(larg, ap, sp - ap);
+			if (cur_opt.oarg && *sp++ != ']') {
+				/* maybe not an optarg? */
+				;
+			}
+			if (*sp == '.') {
+				/* could be mularg */
+				if (sp[1U] == '.' && sp[2U] == '.') {
+					/* yay, 3 dots, read over dots */
+					for (sp += 3U; *sp == '.'; sp++);
+					cur_opt.marg = 1U;
+				}
+			}
 		}
 	} else if (*sp == '-') {
 		/* --option */
@@ -476,6 +506,14 @@ yield:
 				/* maybe not an optarg? */
 				;
 			}
+			if (*sp == '.') {
+				/* could be mularg */
+				if (sp[1U] == '.' && sp[2U] == '.') {
+					/* yay, 3 dots, read over dots */
+					for (sp += 3U; *sp == '.'; sp++);
+					cur_opt.marg = 1U;
+				}
+			}
 		default:
 			break;
 		}
@@ -488,7 +526,9 @@ yield:
 	desc->z = 0U;
 desc:
 	with (size_t sz = llen - (sp - line)) {
-		cur_opt.desc = bbuf_cat(desc, sp, sz);
+		if (LIKELY(sz > 0U)) {
+			cur_opt.desc = bbuf_cat(desc, sp, sz);
+		}
 	}
 	return 1;
 }
@@ -518,30 +558,80 @@ interp(const char *line, size_t llen)
 }
 
 
-static const char *UNUSED(curr_umb);
-static const char *curr_cmd;
 static const char nul_str[] = "";
+static const char *const auto_types[] = {"auto", "flag"};
 static FILE *outf;
+
+static struct {
+	unsigned int no_auto_flags:1U;
+	unsigned int no_auto_action:1U;
+} global_tweaks;
+
+static void
+__identify(char *restrict idn)
+{
+	for (char *restrict ip = idn; *ip; ip++) {
+		switch (*ip) {
+		case '0' ... '9':
+		case 'A' ... 'Z':
+		case 'a' ... 'z':
+			break;
+		default:
+			*ip = '_';
+		}
+	}
+	return;
+}
+
+static char*
+make_opt_ident(const struct opt_s *arg)
+{
+	static bbuf_t i[1U];
+
+	if (arg->lopt != NULL) {
+		bbuf_cpy(i, arg->lopt, strlen(arg->lopt));
+	} else if (arg->sopt) {
+		bbuf_cpy(i, "dash.", 5U);
+		i->s[4U] = arg->sopt;
+	} else {
+		static unsigned int cnt;
+		bbuf_cpy(i, "idnXXXX", 7U);
+		snprintf(i->s + 3U, 5U, "%u", cnt++);
+	}
+	__identify(i->s);
+	return i->s;
+}
+
+static char*
+make_ident(const char *str)
+{
+	static bbuf_t buf[1U];
+
+	bbuf_cpy(buf, str, strlen(str));
+	__identify(buf->s);
+	return buf->s;
+}
 
 static void
 yield_help(void)
 {
-	const char *cmd = curr_cmd ?: nul_str;
+	const char *type = auto_types[global_tweaks.no_auto_action];
 
-	fprintf(outf, "yuck_add_option([h], [help], [auto], [%s])\n", cmd);
-	fprintf(outf, "yuck_set_option_desc([h], [help], [%s], [\
-display this help and exit])\n", cmd);
+	fprintf(outf, "yuck_add_option([help], [h], [help], [%s])\n", type);
+	fprintf(outf, "yuck_set_option_desc([help], [\
+display this help and exit])\n");
 	return;
 }
 
 static void
 yield_version(void)
 {
-	const char *cmd = curr_cmd ?: nul_str;
+	const char *type = auto_types[global_tweaks.no_auto_action];
 
-	fprintf(outf, "yuck_add_option([V], [version], [auto], [%s])\n", cmd);
-	fprintf(outf, "yuck_set_option_desc([V], [version], [%s], [\
-output version information and exit])\n", cmd);
+	fprintf(outf,
+		"yuck_add_option([version], [V], [version], [%s])\n", type);
+	fprintf(outf, "yuck_set_option_desc([version], [\
+output version information and exit])\n");
 	return;
 }
 
@@ -555,22 +645,28 @@ yield_usg(const struct usg_s *arg)
 		massage_desc(arg->desc);
 	}
 	if (arg->cmd != NULL) {
-		curr_cmd = arg->cmd;
-		fprintf(outf, "\nyuck_add_command([%s], [%s])\n", arg->cmd, parg);
+		const char *idn = make_ident(arg->cmd);
+
+		fprintf(outf, "\nyuck_add_command([%s], [%s], [%s])\n",
+			idn, arg->cmd, parg);
 		if (arg->desc != NULL) {
 			fprintf(outf, "yuck_set_command_desc([%s], [%s])\n",
-				arg->cmd, arg->desc);
+				idn, arg->desc);
 		}
 	} else if (arg->umb != NULL) {
-		curr_umb = arg->umb;
-		fprintf(outf, "\nyuck_set_umbrella([%s], [%s])\n", arg->umb, parg);
+		const char *idn = make_ident(arg->umb);
+
+		fprintf(outf, "\nyuck_set_umbrella([%s], [%s], [%s])\n",
+			idn, arg->umb, parg);
 		if (arg->desc != NULL) {
 			fprintf(outf, "yuck_set_umbrella_desc([%s], [%s])\n",
-				arg->umb, arg->desc);
+				idn, arg->desc);
 		}
 		/* insert auto-help and auto-version */
-		yield_help();
-		yield_version();
+		if (!global_tweaks.no_auto_flags) {
+			yield_help();
+			yield_version();
+		}
 	}
 	return;
 }
@@ -580,30 +676,29 @@ yield_opt(const struct opt_s *arg)
 {
 	char sopt[2U] = {arg->sopt, '\0'};
 	const char *opt = arg->lopt ?: nul_str;
-	const char *cmd = curr_cmd ?: nul_str;
+	const char *idn = make_opt_ident(arg);
 
 	if (arg->larg == NULL) {
-		fprintf(outf, "yuck_add_option([%s], [%s], [flag], [%s]);\n",
-			sopt, opt, cmd);
+		fprintf(outf, "yuck_add_option([%s], [%s], [%s], "
+			"[flag]);\n", idn, sopt, opt);
 	} else {
 		const char *asufs[] = {
 			nul_str, ", opt", ", mul", ", mul, opt"
 		};
 		const char *asuf = asufs[arg->oarg | arg->marg << 1U];
-		fprintf(outf,
-			"yuck_add_option([%s], [%s], [arg, %s%s], [%s]);\n",
-			sopt, opt, arg->larg, asuf, cmd);
+		fprintf(outf, "yuck_add_option([%s], [%s], [%s], "
+			"[arg, %s%s]);\n", idn, sopt, opt, arg->larg, asuf);
 	}
 	if (arg->desc != NULL) {
 		massage_desc(arg->desc);
-		fprintf(outf, "yuck_set_option_desc([%s], [%s], [%s], [%s])\n",
-			sopt, opt, cmd, arg->desc);
+		fprintf(outf,
+			"yuck_set_option_desc([%s], [%s])\n", idn, arg->desc);
 	}
 	return;
 }
 
 static void
-yield_inter(bbuf_t x[static 1U])
+yield_inter(const bbuf_t x[static 1U])
 {
 	if (x->z) {
 		if (x->s[x->z - 1U] == '\n') {
@@ -669,18 +764,30 @@ snarf_f(FILE *f)
 {
 	char *line = NULL;
 	size_t llen = 0U;
-	ssize_t nrd;
 
-	while ((nrd = getline(&line, &llen, f)) > 0) {
+#if defined HAVE_GETLINE
+	for (ssize_t nrd; (nrd = getline(&line, &llen, f)) > 0;) {
 		if (*line == '#') {
 			continue;
 		}
 		snarf_ln(line, nrd);
 	}
+#elif defined HAVE_FGETLN
+	while ((line = fgetln(f, &llen)) != NULL) {
+		if (*line == '#') {
+			continue;
+		}
+		snarf_ln(line, llen);
+	}
+#else
+# error neither getline() nor fgetln() available, cannot read file line by line
+#endif	/* GETLINE/FGETLN */
 	/* drain */
 	snarf_ln(NULL, 0U);
 
+#if defined HAVE_GETLINE
 	free(line);
+#endif	/* HAVE_GETLINE */
 	return 0;
 }
 
@@ -739,8 +846,6 @@ divert[]dnl\n", outf);
 # define PATH_MAX	(256U)
 #endif	/* !PATH_MAX */
 static char dslfn[PATH_MAX];
-static char gencfn[PATH_MAX];
-static char genhfn[PATH_MAX];
 
 static bool
 aux_in_path_p(const char *aux, const char *path, size_t pathz)
@@ -848,14 +953,9 @@ bang:
 }
 
 static int
-find_auxs(void)
+find_dsl(void)
 {
-	int rc = 0;
-
-	rc += find_aux(dslfn, sizeof(dslfn), "yuck.m4");
-	rc += find_aux(gencfn, sizeof(gencfn), "yuck-coru.m4c");
-	rc += find_aux(genhfn, sizeof(genhfn), "yuck-coru.m4h");
-	return rc;
+	return find_aux(dslfn, sizeof(dslfn), "yuck.m4");
 }
 
 static __attribute__((noinline)) int
@@ -878,6 +978,7 @@ run_m4(const char *outfn, ...)
 		int rc;
 		int st;
 
+		rc = 2;
 		while (waitpid(m4p, &st, 0) != m4p);
 		if (WIFEXITED(st)) {
 			rc = WEXITSTATUS(st);
@@ -889,6 +990,12 @@ run_m4(const char *outfn, ...)
 		break;
 	}
 
+	/* checkout the environment, look for M4 */
+	with (char *em4) {
+		if ((em4 = getenv("M4")) != NULL) {
+			m4_cmdline[0U] = em4;
+		}
+	}
 	/* child code here */
 	va_start(vap, outfn);
 	for (size_t i = 2U;
@@ -916,6 +1023,89 @@ run_m4(const char *outfn, ...)
 bollocks:
 	_exit(EXIT_FAILURE);
 }
+
+static int
+wr_intermediary(char *const args[], size_t nargs)
+{
+	int rc = 0;
+
+	fputs("\
+changequote([,])dnl\n\
+divert([-1])\n", outf);
+
+	if (nargs == 0U) {
+		if (snarf_f(stdin) < 0) {
+			error("cannot interpret directives on stdin");
+			rc = 1;
+		}
+	}
+	for (unsigned int i = 0U; i < nargs && rc == 0; i++) {
+		const char *fn = args[i];
+		FILE *yf;
+
+		if (UNLIKELY((yf = fopen(fn, "r")) == NULL)) {
+			error("cannot open file `%s'", fn);
+			rc = 1;
+			break;
+		} else if (snarf_f(yf) < 0) {
+			error("cannot interpret directives from `%s'", fn);
+			rc = 1;
+		}
+
+		/* clean up */
+		fclose(yf);
+	}
+	/* make sure we close the outfile */
+	fputs("\n\
+changecom([//])\n\
+divert[]dnl\n", outf);
+	return rc;
+}
+
+static int
+wr_header(const char hdr[static 1U])
+{
+	/* massage the hdr bit a bit */
+	if (strcmp(hdr, "/dev/null")) {
+		/* /dev/null just means ignore the header aye? */
+		const char *hp;
+
+		if ((hp = strrchr(hdr, '/')) == NULL) {
+			hp = hdr;
+		} else {
+			hp++;
+		};
+		fprintf(outf, "define([YUCK_HEADER], [%s])dnl\n", hp);
+	}
+	return 0;
+}
+
+static int
+wr_man_date(void)
+{
+	time_t now;
+	const struct tm *tp;
+	char buf[32U];
+	int rc = 0;
+
+	if ((now = time(NULL)) == (time_t)-1) {
+		rc = -1;
+	} else if ((tp = gmtime(&now)) == NULL) {
+		rc = -1;
+	} else if (!strftime(buf, sizeof(buf), "%B %Y", tp)) {
+		rc = -1;
+	} else {
+		fprintf(outf, "define([YUCK_MAN_DATE], [%s])dnl\n", buf);
+	}
+	return rc;
+}
+
+static int
+wr_version(const char ver[static 1U])
+{
+	fprintf(outf, "define([YUCK_VER], [%s])dnl\n", ver);
+	return 0;
+}
 #endif	/* !BOOTSTRAP */
 
 
@@ -926,68 +1116,46 @@ static int
 cmd_gen(const struct yuck_cmd_gen_s argi[static 1U])
 {
 	static const char deffn[] = "yuck.m4i";
+	static char gencfn[PATH_MAX];
+	static char genhfn[PATH_MAX];
 	int rc = 0;
+
+	if (argi->no_auto_flags_flag) {
+		global_tweaks.no_auto_flags = 1U;
+	}
+	if (argi->no_auto_actions_flag) {
+		global_tweaks.no_auto_action = 1U;
+	}
 
 	/* deal with the output first */
 	if (UNLIKELY((outf = fopen(deffn, "w")) == NULL)) {
 		error("cannot open intermediate file `%s'", deffn);
 		return -1;
 	}
-
-	fputs("\
-changequote([,])dnl\n\
-divert([-1])\n", outf);
-
-	if (argi->nargs == 0U) {
-		if (snarf_f(stdin) < 0) {
-			error("gen command failed on stdin");
-			rc = 1;
-		}
+	/* write up our findings in DSL language */
+	rc = wr_intermediary(argi->args, argi->nargs);
+	/* deal with hard wired version numbers */
+	if (argi->version_arg) {
+		rc += wr_version(argi->version_arg);
 	}
-	for (unsigned int i = 0U; i < argi->nargs && rc == 0; i++) {
-		const char *fn = argi->args[i];
-		FILE *yf;
-
-		if (UNLIKELY((yf = fopen(fn, "r")) == NULL)) {
-			error("cannot open file `%s'", fn);
-			rc = 1;
-			break;
-		} else if (snarf_f(yf) < 0) {
-			error("gen command failed on `%s'", fn);
-			rc = 1;
-		}
-
-		/* clean up */
-		fclose(yf);
-	}
-	/* special directive for the header */
+	/* special directive for the header or is it */
 	if (argi->header_arg != NULL) {
-		const char *hdr = argi->header_arg;
-
-		/* massage the hdr bit a bit */
-		if (strcmp(hdr, "/dev/null")) {
-			/* /dev/null just means ignore the header aye? */
-			const char *hp;
-
-			if ((hp = strrchr(hdr, '/')) == NULL) {
-				hp = hdr;
-			} else {
-				hp++;
-			};
-			fprintf(outf, "\ndefine([YUCK_HEADER], [%s])\n", hp);
-		}
+		rc += wr_header(argi->header_arg);
 	}
-	/* make sure we close the outfile */
-	fputs("\n\
-changecom([//])\n\
-divert[]dnl\n", outf);
+	/* and we're finished with the intermediary */
 	fclose(outf);
+
 	/* only proceed if there has been no error yet */
 	if (rc) {
 		goto out;
-	} else if (find_auxs() < 0) {
+	} else if (find_dsl() < 0) {
 		/* error whilst finding our DSL and things */
-		error("cannot find yuck dsl and template files");
+		error("cannot find yuck dsl file");
+		rc = 2;
+		goto out;
+	} else if (find_aux(gencfn, sizeof(gencfn), "yuck-coru.m4c") < 0 ||
+		   find_aux(genhfn, sizeof(genhfn), "yuck-coru.m4h") < 0) {
+		error("cannot find yuck template files");
 		rc = 2;
 		goto out;
 	}
@@ -1012,10 +1180,78 @@ out:
 	return rc;
 }
 
+static int
+cmd_genman(const struct yuck_cmd_genman_s argi[static 1U])
+{
+	static const char deffn[] = "yuck.m4i";
+	static char genmfn[PATH_MAX];
+	int rc = 0;
+
+	/* deal with the output first */
+	if (UNLIKELY((outf = fopen(deffn, "w")) == NULL)) {
+		error("cannot open intermediate file `%s'", deffn);
+		return -1;
+	}
+	/* write up our findings in DSL language */
+	rc = wr_intermediary(argi->args, argi->nargs);
+	if (argi->version_arg) {
+		rc += wr_version(argi->version_arg);
+	}
+	/* at least give the man page template an idea for YUCK_MAN_DATE */
+	rc += wr_man_date();
+	/* and we're finished with the intermediary */
+	fclose(outf);
+
+	/* only proceed if there has been no error yet */
+	if (rc) {
+		goto out;
+	} else if (find_dsl() < 0) {
+		/* error whilst finding our DSL and things */
+		error("cannot find yuck dsl and template files");
+		rc = 2;
+		goto out;
+	} else if (find_aux(genmfn, sizeof(genmfn), "yuck.m4man") < 0) {
+		error("cannot find yuck template for man pages");
+		rc = 2;
+		goto out;
+	}
+	/* now route that stuff through m4 */
+	with (const char *outfn = argi->output_arg) {
+		/* standard case: pipe directives, then header, then code */
+		rc = run_m4(outfn, deffn, genmfn, NULL);
+	}
+out:
+	if (!0/*argi->keep_intermediate*/) {
+		unlink(deffn);
+	}
+	return rc;
+}
+
+static int
+cmd_gendsl(const struct yuck_cmd_gendsl_s argi[static 1U])
+{
+	int rc = 0;
+
+	if (argi->no_auto_flags_flag) {
+		global_tweaks.no_auto_flags = 1U;
+	}
+	if (argi->no_auto_actions_flag) {
+		global_tweaks.no_auto_action = 1U;
+	}
+
+	/* bang to stdout */
+	outf = stdout;
+	rc += wr_intermediary(argi->args, argi->nargs);
+	if (argi->version_arg) {
+		rc += wr_version(argi->version_arg);
+	}
+	return rc;
+}
+
 int
 main(int argc, char *argv[])
 {
-	struct yuck_s argi[1U];
+	yuck_t argi[1U];
 	int rc = 0;
 
 	if (yuck_parse(argi, argc, argv) < 0) {
@@ -1030,8 +1266,18 @@ No valid command specified.\n\
 See --help to obtain a list of available commands.\n", stderr);
 		rc = 1;
 		goto out;
-	case yuck_gen:
+	case YUCK_CMD_GEN:
 		if ((rc = cmd_gen((const void*)argi)) < 0) {
+			rc = 1;
+		}
+		break;
+	case YUCK_CMD_GENDSL:
+		if ((rc = cmd_gendsl((const void*)argi)) < 0) {
+			rc = 1;
+		}
+		break;
+	case YUCK_CMD_GENMAN:
+		if ((rc = cmd_genman((const void*)argi)) < 0) {
 			rc = 1;
 		}
 		break;

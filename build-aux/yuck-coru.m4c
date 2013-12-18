@@ -1,7 +1,11 @@
 /* -*- c -*- */
+changecom([#])dnl
 #if defined HAVE_CONFIG_H
 # include "config.h"
 #endif	/* HAVE_CONFIG_H */
+#if defined HAVE_VERSION_H
+# include "version.h"
+#endif	/* HAVE_VERSION_H */
 #include <stdlib.h>
 #include <stdbool.h>
 #include <string.h>
@@ -18,7 +22,9 @@ ifdef([YUCK_HEADER], [#include "YUCK_HEADER"
 # endif	 /* GCC version */
 # pragma GCC diagnostic ignored "-Wunused-label"
 # pragma GCC diagnostic ignored "-Wunused-variable"
+# pragma GCC diagnostic ignored "-Wunused-function"
 #endif	/* __INTEL_COMPILER */
+pushdef([DEFUN], ifdef([YUCK_HEADER], [], [static]))[]dnl
 
 
 static inline bool
@@ -27,12 +33,24 @@ yuck_streqp(const char *s1, const char *s2)
 	return !strcmp(s1, s2);
 }
 
+/* for multi-args */
+static inline const char**
+yuck_append(const char **array, size_t n, const char *val)
+{
+	if (!(n % 16U)) {
+		/* resize */
+		array = realloc(array, (n + 16U) * sizeof(*array));
+	}
+	array[[n]] = val;
+	return array;
+}
+
 static enum yuck_cmds_e yuck_parse_cmd(const char *cmd)
 {
 	if (0) {
 		;
-	}foreachq([C], yuck_cmds(), [ else if (yuck_streqp(cmd, "yuck_cmd_string(C)")) {
-		return yuck_cmd(C);
+	}foreachq([C], yuck_cmds(), [ else if (yuck_streqp(cmd, "yuck_cmd_string(defn([C]))")) {
+		return yuck_cmd(defn([C]));
 	}]) else {
 		/* error here? */
 		fprintf(stderr, "YUCK_UMB: invalid command `%s'\n\
@@ -41,81 +59,8 @@ Try `--help' for a list of commands.\n", cmd);
 	return (enum yuck_cmds_e)-1;
 }
 
-static void yuck_auto_usage(enum yuck_cmds_e cmd)
-{
-	switch (cmd) {
-	default:
-	YUCK_NONE:
-		if (!YUCK_NCMDS) {
-			puts("Usage: YUCK_UMB [[OPTION]]... defn([YUCK_UMB.POSARG])");
-		} else {
-			puts("Usage: YUCK_UMB [[OPTION]]... COMMAND defn([YUCK_UMB.POSARG])");
-		}
-ifelse(yuck_umb_desc(), [], [], [dnl
-		puts("\n\
-yuck_C_literal(yuck_umb_desc())");
-])dnl
-		break;
-foreachq([C], yuck_cmds(), [
-	case yuck_cmd(C):
-		puts("Usage: YUCK_UMB [[OPTION]]... yuck_cmd_string(C) yuck_cmd_posarg(C)");
-ifelse(yuck_cmd_desc(C), [], [], [dnl
-		puts("\n\
-yuck_C_literal(yuck_cmd_desc(C))");
-])dnl
-		break;
-])
-	}
-	return;
-}
-
-static void yuck_auto_help(enum yuck_cmds_e cmd)
-{
-	yuck_auto_usage(cmd);
-
-ifelse(yuck_cmds(), [], [], [dnl
-	if (cmd == YUCK_NONE) {
-		/* also output a list of commands */
-		puts("\nCOMMAND may be one of:\n\
-foreachq([C], yuck_cmds(), [  yuck_cmd_string(C)\n\
-])");
-	}
-])dnl
-
-	switch (cmd) {
-	default:foreachq([C], yuck_umbcmds(), [
-	case yuck_cmd(C):
-		puts("\n\
-foreachq([I], yuck_idents(C), [dnl
-yuck_C_literal(yuck_option_help_line(defn([I]), defn([C])))[]dnl
-])dnl
-");
-		break;
-])
-	}
-	return;
-}
-
-static void yuck_auto_version(enum yuck_cmds_e cmd)
-{
-	switch (cmd) {
-	default:
-ifdef([YUCK_VER], [dnl
-		puts("YUCK_UMB YUCK_VER");
-], [dnl
-#if defined PACKAGE_VERSION
-		puts(PACKAGE_VERSION);
-#else
-		puts("YUCK_UMB unknown version");
-#endif	/* PACKAGE_VERSION */
-])dnl
-		break;
-	}
-	return;
-}
-
 
-int yuck_parse(struct yuck_s *restrict tgt, int argc, char *const argv[[]])
+DEFUN int yuck_parse(yuck_t tgt[[static 1U]], int argc, char *const argv[[]])
 {
 	const char *op;
 	char **args;
@@ -125,7 +70,6 @@ int yuck_parse(struct yuck_s *restrict tgt, int argc, char *const argv[[]])
 	memset(tgt, 0, sizeof(*tgt));
 	tgt->args = args = calloc(argc, sizeof(*tgt->args));
 	tgt->nargs = 0U;
-	tgt->cmd = YUCK_NONE;
 	for (i = 1; i < argc; i++) {
 		op = argv[[i]];
 
@@ -169,26 +113,44 @@ int yuck_parse(struct yuck_s *restrict tgt, int argc, char *const argv[[]])
 		default:
 			yield(yuck_cmd()[_longopt]);
 			break;
-		foreachq([C], yuck_cmds(), [case yuck_cmd(C):
-			yield(yuck_cmd(C)[_longopt]);
+		foreachq([C], yuck_cmds(), [case yuck_cmd(defn([C])):
+			yield(yuck_cmd(defn([C]))[_longopt]);
 			break;
 		])}
 		resume;
 
-		foreachq([C], yuck_umbcmds(), [coroutine(yuck_cmd(C)[_longopt])
+dnl TYPE actions
+pushdef([yuck_flag_action], [tgt->yuck_slot([$1], [$2])++])dnl
+pushdef([yuck_arg_action], [tgt->yuck_slot([$1], [$2]) = arg ?: argv[[++i]]])dnl
+pushdef([yuck_arg_opt_action], [tgt->yuck_slot([$1], [$2]) = arg ?: YUCK_OPTARG_NONE])dnl
+pushdef([yuck_arg_mul_action], [tgt->yuck_slot([$1], [$2]) =
+					yuck_append(
+						tgt->yuck_slot([$1], [$2]), tgt->yuck_cnt_slot([$1], [$2])++,
+						arg ?: argv[[++i]])])dnl
+pushdef([yuck_arg_mul_opt_action], [tgt->yuck_slot([$1], [$2]) =
+					yuck_append(
+						tgt->yuck_slot([$1], [$2]), tgt->yuck_cnt_slot([$1], [$2])++,
+						arg ?: YUCK_OPTARG_NONE)])dnl
+pushdef([yuck_auto_action], [/* invoke auto action and exit */
+				yuck_auto_[]yuck_canon([$1], [$2])(tgt);
+				resume_at(success)])dnl
+
+		foreachq([C], yuck_umbcmds(), [coroutine(yuck_cmd(defn([C]))[_longopt])
 		{
 			if (0) {
 				;
-			}foreachq([opt], yuck_longs(C), [ else if (yuck_streqp(op, "opt")) {
-				yuck_iftype(opt, C, 
-					[flag], [tgt->yuck_slot(opt, C)++],
-					[arg], [tgt->yuck_slot(opt, C) = arg ?: argv[[++i]]],
-					[arg,opt], [tgt->yuck_slot(opt, C) = arg ?: YUCK_OPTARG_NONE],
-					[auto], [/* invoke auto action and exit */
-				yuck_auto_[]yuck_canon(opt, C)(tgt->cmd);
-				resume_at(success)]);
-			}]) else {
-				ifelse(C, [],
+			}dnl
+foreachq([I], yuck_idents(defn([C])), [ dnl
+pushdef([long], yuck_long(defn([I]), defn([C])))[]dnl
+ifelse(defn([long]), [], [divert(-1)])dnl
+else if (yuck_streqp(op, "defn([long])")) {
+popdef([long])[]dnl
+dnl now simply expand yuck_foo_action:
+				yuck_option_action(defn([I]), defn([C]));
+			}dnl
+divert[]dnl
+]) else {
+				ifelse(defn([C]), [],
 				       [/* grml */
 				fprintf(stderr, "YUCK_UMB: unrecognized option `--%s'\n", op);
 				resume_at(failure);],
@@ -197,6 +159,12 @@ int yuck_parse(struct yuck_s *restrict tgt, int argc, char *const argv[[]])
 			resume;
 		}
 		])
+popdef([yuck_flag_action])dnl
+popdef([yuck_arg_action])dnl
+popdef([yuck_arg_mul_action])dnl
+popdef([yuck_arg_opt_action])dnl
+popdef([yuck_arg_mul_opt_action])dnl
+popdef([yuck_auto_action])dnl
 	}
 
 	coroutine(shortopt)
@@ -207,13 +175,35 @@ int yuck_parse(struct yuck_s *restrict tgt, int argc, char *const argv[[]])
 		default:
 			yield(yuck_cmd()[_shortopt]);
 			break;
-		foreachq([C], yuck_cmds(), [case yuck_cmd(C):
-			yield(yuck_cmd(C)[_shortopt]);
+		foreachq([C], yuck_cmds(), [case yuck_cmd(defn([C])):
+			yield(yuck_cmd(defn([C]))[_shortopt]);
 			break;
 		])}
 		resume;
 
-		foreachq([C], yuck_umbcmds(), [coroutine(yuck_cmd(C)[_shortopt])
+dnl TYPE actions
+pushdef([yuck_flag_action], [tgt->yuck_slot([$1], [$2])++])dnl
+pushdef([yuck_arg_action], [tgt->yuck_slot([$1], [$2]) = *arg
+					? (op += strlen(arg), arg)
+					: argv[[++i]]])dnl
+pushdef([yuck_arg_opt_action], [tgt->yuck_slot([$1], [$2]) = *arg
+					? (op += strlen(arg), arg)
+					: YUCK_OPTARG_NONE])dnl
+pushdef([yuck_arg_mul_action], [tgt->yuck_slot([$1], [$2]) =
+					yuck_append(
+						tgt->yuck_slot([$1], [$2]),
+						tgt->yuck_cnt_slot([$1], [$2])++,
+						*arg ? (op += strlen(arg), arg) : argv[[++i]])])dnl
+pushdef([yuck_arg_mul_opt_action], [tgt->yuck_slot([$1], [$2]) =
+					yuck_append(
+						tgt->yuck_slot([$1], [$2]),
+						tgt->yuck_cnt_slot([$1], [$2])++,
+						*arg ? (op += strlen(arg), arg) : YUCK_OPTARG_NONE)])dnl
+pushdef([yuck_auto_action], [/* invoke auto action and exit */
+				yuck_auto_[]yuck_canon([$1], [$2])(tgt);
+				resume_at(success)])dnl
+
+		foreachq([C], yuck_umbcmds(), [coroutine(yuck_cmd(defn([C]))[_shortopt])
 		{
 			switch (*op) {
 			default:
@@ -221,7 +211,7 @@ int yuck_parse(struct yuck_s *restrict tgt, int argc, char *const argv[[]])
 				fprintf(stderr, "YUCK_UMB: invalid option -%c\n", *op);
 				resume_at(failure);
 
-ifelse(quote(translit(yuck_shorts, [0123465789])), quote(yuck_shorts), [], [
+ifdef([YUCK_SHORTS_HAVE_NUMERALS], [
 				/* [yuck_shorts()] (= yuck_shorts())
 				 * has numerals as shortopts
 				 * don't allow literal treatment of numerals */divert(-1)])
@@ -233,25 +223,30 @@ ifelse(quote(translit(yuck_shorts, [0123465789])), quote(yuck_shorts), [], [
 				resume_at(yuck_cmd()[_shortopt]);
 
 				divert(0);
-				ifelse(C, [], [select_divert(1)], [select_divert(2)])dnl
+				ifelse(defn([C]), [], [select_divert(1)], [select_divert(2)])dnl
+divert[]dnl
 
-			foreachq([opt], yuck_shorts(C), [case 'opt':
-				yuck_iftype(opt, C, 
-					[flag], [tgt->yuck_slot(opt, C)++],
-					[arg], [tgt->yuck_slot(opt, C) = *arg
-						? (op += strlen(arg), arg)
-						: argv[[++i]]],
-					[arg,opt], [tgt->yuck_slot(opt, C) = *arg
-						? (op += strlen(arg), arg)
-						: YUCK_OPTARG_NONE],
-					[auto], [/* invoke auto action and exit */
-				yuck_auto_[]yuck_canon(opt, C)(tgt->cmd);
-				resume_at(success)]);
+foreachq([I], yuck_idents(defn([C])), [dnl
+pushdef([short], yuck_short(defn([I]), defn([C])))dnl
+ifelse(defn([short]), [], [divert(-1)])dnl
+			case 'defn([short])':
+popdef([short])dnl
+dnl
+dnl now simply expand yuck_foo_action:
+				yuck_option_action(defn([I]), defn([C]));
 				break;
-			])}
+divert[]dnl
+])dnl
+			}
 			resume;
 		}
 		])
+popdef([yuck_flag_action])dnl
+popdef([yuck_arg_action])dnl
+popdef([yuck_arg_opt_action])dnl
+popdef([yuck_arg_mul_action])dnl
+popdef([yuck_arg_mul_opt_action])dnl
+popdef([yuck_auto_action])dnl
 	}
 
 	coroutine(arg)
@@ -289,15 +284,137 @@ ifelse(quote(translit(yuck_shorts, [0123465789])), quote(yuck_shorts), [], [
 	}
 }
 
-void yuck_free(struct yuck_s *restrict tgt)
+DEFUN void yuck_free(yuck_t tgt[[static 1U]])
 {
 	if (tgt->args != NULL) {
 		/* free despite const qualifier */
 		free((char*)NULL + ((const char*)tgt->args - (char*)NULL));
 	}
+	/* free mulargs */
+	switch (tgt->cmd) {
+		void *ptr;
+	default:
+		break;
+pushdef([action], [dnl
+		ptr = (char*)NULL + ((const char*)tgt->yuck_slot([$1], [$2]) - (char*)NULL);
+		if (ptr != NULL) {
+			free(ptr);
+		}
+])dnl
+dnl TYPE actions
+pushdef([yuck_flag_action], [])dnl
+pushdef([yuck_arg_action], [])dnl
+pushdef([yuck_arg_opt_action], [])dnl
+pushdef([yuck_arg_mul_action], defn([action]))dnl
+pushdef([yuck_arg_mul_opt_action], defn([action]))dnl
+pushdef([yuck_auto_action], [])dnl
+foreachq([C], yuck_umbcmds(), [dnl
+	case yuck_cmd(defn([C])):
+foreachq([I], yuck_idents(defn([C])), [dnl
+		yuck_option_action(defn([I]), defn([C]));
+		break;
+])[]dnl
+])[]dnl
+popdef([action])dnl
+popdef([yuck_flag_action])dnl
+popdef([yuck_arg_action])dnl
+popdef([yuck_arg_opt_action])dnl
+popdef([yuck_arg_mul_action])dnl
+popdef([yuck_arg_mul_opt_action])dnl
+popdef([yuck_auto_opt_action])dnl
+	}
 	return;
 }
 
+DEFUN void yuck_auto_usage(const yuck_t src[[static 1U]])
+{
+	switch (src->cmd) {
+	default:
+	YUCK_NOCMD:
+		puts("Usage: YUCK_UMB [[OPTION]]...dnl
+ifelse(yuck_cmds(), [], [], [ COMMAND])[]dnl
+ifelse(defn([YUCK_UMB_POSARG]), [], [], [ defn([YUCK_UMB_POSARG])])[]dnl
+");
+ifelse(yuck_umb_desc(), [], [], [dnl
+		puts("\n\
+yuck_C_literal(yuck_umb_desc())");
+])dnl
+		break;
+foreachq([C], yuck_cmds(), [
+	case yuck_cmd(defn([C])):
+		puts("Usage: YUCK_UMB [[OPTION]]... yuck_cmd_string(defn([C]))[]dnl
+ifelse(yuck_cmd_posarg(defn([C])), [], [], [ yuck_cmd_posarg(defn([C]))])");
+ifelse(yuck_cmd_desc(defn([C])), [], [], [dnl
+		puts("\n\
+yuck_C_literal(yuck_cmd_desc(defn([C])))");
+])dnl
+		break;
+])
+	}
+	return;
+}
+
+DEFUN void yuck_auto_help(const yuck_t src[[static 1U]])
+{
+	yuck_auto_usage(src);
+
+ifelse(yuck_cmds(), [], [], [dnl
+	if (src->cmd == YUCK_NOCMD) {
+		/* also output a list of commands */
+		puts("\nCOMMAND may be one of:\n\
+foreachq([C], yuck_cmds(), [  yuck_cmd_string(defn([C]))\n\
+])");
+	}
+])dnl
+
+	switch (src->cmd) {
+	default:foreachq([C], yuck_umbcmds(), [
+	case yuck_cmd(defn([C])):
+		puts("\n\
+foreachq([I], yuck_idents(defn([C])), [dnl
+yuck_C_literal(yuck_option_help_line(defn([I]), defn([C])))[]dnl
+])dnl
+"
+#if defined PACKAGE_BUGREPORT
+"\n\
+Report bugs to " PACKAGE_BUGREPORT
+#endif	/* PACKAGE_BUGREPORT */
+);
+		break;
+])
+	}
+	return;
+}
+
+DEFUN void yuck_auto_version(const yuck_t src[[static 1U]])
+{
+	switch (src->cmd) {
+	default:
+ifdef([YUCK_VER], [dnl
+		puts("YUCK_UMB YUCK_VER");
+], [dnl
+#if 0
+
+#elif defined package_string
+		puts(package_string);
+#elif defined package_version
+		printf("YUCK_UMB %s\n", package_version);
+#elif defined PACKAGE_STRING
+		puts(PACKAGE_STRING);
+#elif defined PACKAGE_VERSION
+		puts("YUCK_UMB " PACKAGE_VERSION);
+#elif defined VERSION
+		puts("YUCK_UMB " VERSION);
+#else  /* !PACKAGE_VERSION, !VERSION */
+		puts("YUCK_UMB unknown version");
+#endif	/* PACKAGE_VERSION */
+])dnl
+		break;
+	}
+	return;
+}
+
+popdef([DEFUN])dnl
 #if defined __INTEL_COMPILER
 # pragma warning (default:177)
 # pragma warning (default:111)

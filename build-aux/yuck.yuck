@@ -5,7 +5,28 @@ Generate command line option parsers for umbrella commands.
 ## Usages of the single commands
 Usage: yuck [OPTION]... gen [FILE]...
 
-Generate a parser with definitions from FILE, or stdin if omitted.
+Generate a parser from definitions in FILE, or stdin if omitted.
 
   -H, --header=FILE  Also generate a header file.
   -o, --output=FILE  Output goes into FILE instead of stdout.
+  --no-auto-flags    Do not add auto flags (--help, --version).
+  --no-auto-actions  Do not automatically handle auto flags.
+  --version=VERSION  Hardwire version number.
+
+## GENMAN
+Usage: yuck [OPTION]... genman [FILE]...
+
+Generate a man page from definitions in FILE, or stdin if omitted.
+
+  -o, --output=FILE  Output goes into FILE instead of stdout.
+  --version=VERSION  Hardwire version number.
+
+## GENDSL
+Usage: yuck gendsl [FILE]...
+
+Generate the intermediary description of definitions from FILE, or stdin
+if omitted.
+
+  --no-auto-flags    Do not add auto flags (--help, --version).
+  --no-auto-actions  Do not automatically handle auto flags.
+  --version=VERSION  Hardwire version number.
