@@ -981,7 +981,7 @@ prepend_path(const char *p)
 		size_t envz = strlen(envp);
 
 		/* get us a nice big cushion */
-		pathz = ((envz + pz + 1U) / 256U + 1U) * 256U;
+		pathz = ((envz + pz + 1U) / 256U + 2U) * 256U;
 		paths = malloc(pathz);
 		/* glue the current path at the end of the array */
 		pp = (paths + pathz) - (envz + 1U);
