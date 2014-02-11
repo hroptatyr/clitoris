@@ -1,6 +1,6 @@
 /*** shack.c -- sha check
  *
- * Copyright (C) 2013 Sebastian Freundt
+ * Copyright (C) 2013-2014 Sebastian Freundt
  *
  * Author:  Sebastian Freundt <freundt@ga-group.nl>
  *
@@ -241,7 +241,7 @@ sha_chunk(const uint32_t b32[static 16], sha_t old)
 #define e	res.v[4U]
 
 	/* extend the sixteen 32-bit words that make up BUF into 80 words */
-	for (size_t i = 0; i < 16U; i++) {
+	for (size_t i = 0U; i < 16U; i++) {
 		s32[i] = be32toh(b32[i]);
 	}
 	for (size_t i = 16U; i < 32U; i++) {
@@ -254,7 +254,7 @@ sha_chunk(const uint32_t b32[static 16], sha_t old)
 	}
 
 	/* main loop */
-	for (size_t i = 0; i < 80U; i++) {
+	for (size_t i = 0U; i < 80U; i++) {
 		uint32_t f, k;
 
 		switch (i / 20U) {
@@ -273,6 +273,9 @@ sha_chunk(const uint32_t b32[static 16], sha_t old)
 		case 3u/*60u ... 79u*/:
 			f = b ^ c ^ d;
 			k = 0xca62c1d6u;
+			break;
+		default:
+			/* cpu broken! */
 			break;
 		}
 
@@ -353,14 +356,14 @@ shaf(sha_t *tgt, const char *fn)
 		goto out;
 	}
 	/* now map considerable portions of the file and process */
-	for (size_t i = 0; i < fz / pgsz; i++) {
+	for (size_t i = 0U; i < fz / pgsz; i++) {
 		off_t o = i * pgsz;
 		void *p = mmap(NULL, pgsz, PROT_READ, MAP_SHARED, fd, o);
 
 		if (UNLIKELY(p == MAP_FAILED)) {
 			goto clo;
 		}
-		for (size_t j = 0; j < pgsz; j += 64U) {
+		for (size_t j = 0U; j < pgsz; j += 64U) {
 			const void *b32 = (const uint8_t*)p + j;
 			h = sha_chunk(b32, h);
 		}
