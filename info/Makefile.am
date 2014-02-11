@@ -20,6 +20,6 @@ BUILT_MANS += shack.man
 ## help2man helpers
 %.man: $(top_srcdir)/src/%.yuck $(top_srcdir)/configure $(top_builddir)/version.mk
 	$(AM_V_GEN) PATH=$(top_builddir)/build-aux:"$${PATH}" \
-		yuck genman --version=$(VERSION) -o $@ $<
+		yuck genman --version-string=$(VERSION) -o $@ $<
 
 ## Makefile.am ends here
