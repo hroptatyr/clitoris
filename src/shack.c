@@ -274,6 +274,9 @@ sha_chunk(const uint32_t b32[static 16], sha_t old)
 			f = b ^ c ^ d;
 			k = 0xca62c1d6u;
 			break;
+		default:
+			/* cpu broken! */
+			break;
 		}
 
 		with (uint32_t tmp = rotl(a, 5U) + f + e + k + s32[i]) {
