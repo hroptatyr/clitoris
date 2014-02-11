@@ -76,6 +76,9 @@
 # define with(args...)	for (args, *__ep__ = (void*)1; __ep__; __ep__ = 0)
 #endif	/* !with */
 
+#if !defined PATH_MAX
+# define PATH_MAX	256U
+#endif	/* !PATH_MAX */
 
 typedef struct clitf_s clitf_t;
 typedef struct clit_buf_s clit_buf_t;
