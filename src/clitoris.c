@@ -1,6 +1,6 @@
 /*** clitoris.c -- command-line-interface tester or is it?
  *
- * Copyright (C) 2013 Sebastian Freundt
+ * Copyright (C) 2013-2014 Sebastian Freundt
  *
  * Author:  Sebastian Freundt <freundt@ga-group.nl>
  *
