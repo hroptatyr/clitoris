@@ -40,6 +40,7 @@
 #include <unistd.h>
 #include <stdarg.h>
 #include <stdlib.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdbool.h>
 #include <limits.h>
@@ -980,7 +981,7 @@ prepend_path(const char *p)
 		size_t envz = strlen(envp);
 
 		/* get us a nice big cushion */
-		pathz = ((envz + pz + 1U) / 256U + 1) * 256U;
+		pathz = ((envz + pz + 1U) / 256U + 1U) * 256U;
 		paths = malloc(pathz);
 		/* glue the current path at the end of the array */
 		pp = (paths + pathz) - (envz + 1U);
@@ -992,14 +993,14 @@ prepend_path(const char *p)
 
 	if (UNLIKELY(pp < paths)) {
 		/* awww, not enough space, is there */
-		off_t ppoff = paths + pathz - pp;
-		size_t newsz = ((pathz + pz + 1U) / 256U + 1) * 256U;
+		ptrdiff_t ppoff = pp - paths;
+		size_t newsz = ((pathz + pz + 1U) / 256U + 1U) * 256U;
 
 		paths = realloc(paths, newsz);
 		/* memmove to the back */
 		memmove(paths + (newsz - pathz), paths, pathz);
 		/* recalc paths pointer */
-		pp = paths + ppoff;
+		pp = paths + (newsz - pathz) + ppoff;
 		pathz = newsz;
 	}
 
