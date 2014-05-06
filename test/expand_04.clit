@@ -1,0 +1,9 @@
+#!/usr/bin/clitoris  ## -*- shell-script -*-
+
+setopt expand-proto-output
+
+$ echo "_ $(echo a) _"
+_ $(echo a) _
+$
+
+## expand_04.clit ends here

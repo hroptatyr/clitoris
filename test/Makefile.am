@@ -24,6 +24,11 @@ TESTS += empty_01.clit
 TESTS += empty_02.clit
 TESTS += empty_03.clit
 
+XFAIL_TESTS += expand_01.clit
+TESTS += expand_02.clit
+TESTS += expand_03.clit
+TESTS += expand_04.clit
+
 TESTS += diff_01.clit
 XFAIL_TESTS += diff_02.clit
 TESTS += diff_03.clit

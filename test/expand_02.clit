@@ -1,0 +1,9 @@
+#!/usr/bin/clitoris  ## -*- shell-script -*-
+
+setopt expand-proto-output
+
+$ echo "${srcdir}"
+${srcdir}
+$
+
+## expand_02.clit ends here
