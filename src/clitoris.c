@@ -319,8 +319,13 @@ find_shtok(const char *bp, size_t bz)
 	for (const char *res;
 	     (res = memchr(bp, '$', bz)) != NULL;
 	     bz -= (res + 1 - bp), bp = res + 1) {
-		/* we're actually after a "\n$" */
-		if (res == bp || res[-1] == '\n') {
+		/* we're actually after a "\n$" or
+		 * a "$" at the beginning of the buffer pointer (bp)
+		 * now check that either the buffer ends there or
+		 * the $ is followed by a newline, or the $ is followed
+		 * by a space, which is the line-to-exec indicator */
+		if ((res == bp || res[-1] == '\n') &&
+		    (bz <= 1U || (res[1] == '\n' || res[1] == ' '))) {
 			return res;
 		}
 	}
