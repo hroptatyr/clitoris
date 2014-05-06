@@ -808,6 +808,7 @@ init_tst(struct clit_chld_s ctx[static 1], struct clit_tst_s tst[static 1])
 		ctx->diff = differ(ctx, tst->out);
 	} else {
 		ctx->diff = -1;
+		ctx->feed = -1;
 		ctx->pou = -1;
 	}
 
@@ -907,6 +908,19 @@ run_tst(struct clit_chld_s ctx[static 1], struct clit_tst_s tst[static 1])
 		}
 	} else {
 		rc = 1;
+	}
+
+	/* wait for the feeder */
+	while (ctx->feed > 0 && waitpid(ctx->feed, &st, 0) != ctx->feed);
+	if (LIKELY(ctx->feed > 0 && WIFEXITED(st))) {
+		int tmp_rc = WEXITSTATUS(st);
+
+		if (tst->ign_out) {
+			/* don't worry */
+			;
+		} else if (tmp_rc > rc) {
+			rc = tmp_rc;
+		}
 	}
 
 	/* finally wait for the differ */
