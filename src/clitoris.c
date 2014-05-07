@@ -118,7 +118,6 @@ struct clit_chld_s {
 	unsigned int verbosep:1;
 	unsigned int ptyp:1;
 	unsigned int keep_going_p:1;
-	unsigned int expand_proto_p:1;
 
 	unsigned int timeo;
 };
@@ -579,8 +578,6 @@ find_opt(struct clit_chld_s ctx[static 1], const char *bp, size_t bz)
 			}
 		} else if (CMP(mp, "keep-going\n") == 0) {
 			ctx->keep_going_p = opt;
-		} else if (CMP(mp, "expand-proto-output\n") == 0) {
-			ctx->expand_proto_p = opt;
 		}
 #undef CMP
 	}
@@ -842,11 +839,7 @@ differ(struct clit_chld_s ctx[static 1], clit_bit_t exp)
 		/* fork out the feeder guy */
 		if (clit_bit_buf_p(exp)) {
 			/* check if we need the expander */
-			if (ctx->expand_proto_p) {
-				ctx->feed = xpnder(exp, expfd);
-			} else {
-				ctx->feed = feeder(exp, expfd);
-			}
+			ctx->feed = feeder(exp, expfd);
 			close(expfd);
 		}
 		break;
