@@ -137,6 +137,8 @@ struct clit_tst_s {
 
 	/** don't pass the output on to external differ */
 	unsigned int supp_diff:1;
+	/** expand the proto-output as though it was a shell here-document */
+	unsigned int xpnd_proto:1;
 
 	/* padding */
 	unsigned int:5;
@@ -319,8 +321,13 @@ find_shtok(const char *bp, size_t bz)
 	for (const char *res;
 	     (res = memchr(bp, '$', bz)) != NULL;
 	     bz -= (res + 1 - bp), bp = res + 1) {
-		/* we're actually after a "\n$" */
-		if (res == bp || res[-1] == '\n') {
+		/* we're actually after a "\n$" or
+		 * a "$" at the beginning of the buffer pointer (bp)
+		 * now check that either the buffer ends there or
+		 * the $ is followed by a newline, or the $ is followed
+		 * by a space, which is the line-to-exec indicator */
+		if ((res == bp || res[-1] == '\n') &&
+		    (bz <= 1U || (res[1] == '\n' || res[1] == ' '))) {
 			return res;
 		}
 	}
@@ -427,8 +434,9 @@ find_ignore(struct clit_tst_s tst[static 1])
 		while (++cmd < ec && isspace(*cmd));
 		tst->cmd.z -= (cmd - tst->cmd.d);
 		tst->cmd.d = cmd;
+		return 0;
 	}
-	return 0;
+	return -1;
 }
 
 static int
@@ -449,7 +457,7 @@ find_negexp(struct clit_tst_s tst[static 1])
 				break;
 			}
 		default:
-			return 0;
+			return -1;
 		}
 
 		/* now, fast-forward to the actual command, and reass */
@@ -469,7 +477,7 @@ find_suppdiff(struct clit_tst_s tst[static 1])
 		case '@':
 			break;
 		default:
-			return 0;
+			return -1;
 		}
 
 		/* now, fast-forward to the actual command, and reass */
@@ -478,6 +486,26 @@ find_suppdiff(struct clit_tst_s tst[static 1])
 		tst->cmd.d = cmd;
 		tst->supp_diff = 1U;
 		tst->ign_out = 1U;
+	}
+	return 0;
+}
+
+static int
+find_xpnd_proto(struct clit_tst_s tst[static 1])
+{
+	with (const char *cmd = tst->cmd.d, *const ec = cmd + tst->cmd.z) {
+		switch (*cmd) {
+		case '$':
+			break;
+		default:
+			return -1;
+		}
+
+		/* now, fast-forward to the actual command, and reass */
+		while (++cmd < ec && isspace(*cmd));
+		tst->cmd.z -= (cmd - tst->cmd.d);
+		tst->cmd.d = cmd;
+		tst->xpnd_proto = 1U;
 	}
 	return 0;
 }
@@ -516,14 +544,20 @@ find_tst(struct clit_tst_s tst[static 1], const char *bp, size_t bz)
 		}
 	}
 
-	/* oh let's see if we should ignore things */
-	find_ignore(tst);
+	while (
+		/* oh let's see if we should ignore things */
+		!find_ignore(tst) ||
 
-	/* check for suppress diff */
-	find_suppdiff(tst);
+		/* check for suppress diff */
+		!find_suppdiff(tst) ||
 
-	/* check for expect and negate operators */
-	find_negexp(tst);
+		/* check for expect and negate operators */
+		!find_negexp(tst) ||
+
+		/* check for proto-output expander */
+		!find_xpnd_proto(tst) ||
+
+		0);
 
 	tst->err = (clit_bit_t){0U};
 	return 0;
@@ -670,7 +704,93 @@ feeder(clit_bit_t exp, int expfd)
 }
 
 static pid_t
-differ(struct clit_chld_s ctx[static 1], clit_bit_t exp)
+xpnder(clit_bit_t exp, int expfd)
+{
+	pid_t feed;
+
+	switch ((feed = fork())) {
+	case -1:
+		/* ah good then */
+		break;
+	case 0:;
+		/* i am the child */
+		ssize_t nwr;
+		int xin[2U];
+		pid_t sh;
+
+		if (UNLIKELY(pipe(xin) < 0)) {
+		fail:
+			/* whatever */
+			exit(EXIT_FAILURE);
+		}
+
+		switch ((sh = fork())) {
+			static char *const sh_args[] = {"sh", "-s", NULL};
+		case -1:
+			/* big fucking problem */
+			goto fail;
+		case 0:
+			/* close write end of pipe */
+			close(xin[1U]);
+			/* redir xin[0U] -> stdin */
+			dup2(xin[0U], STDIN_FILENO);
+			/* close read end of pipe */
+			close(xin[0U]);
+
+			/* redir stdout -> expfd */
+			dup2(expfd, STDOUT_FILENO);
+			/* close expfd */
+			close(expfd);
+
+			/* child again */
+			execv("/bin/sh", sh_args);
+			exit(EXIT_SUCCESS);
+		default:
+			/* parent i am */
+			close(xin[0U]);
+			/* also forget about expfd */
+			close(expfd);
+			break;
+		}
+
+		if (write(xin[1U], "cat <<EOF\n", 10U) < 10U) {
+			goto fail;
+		}
+		while (exp.z > 0 &&
+		       (nwr = write(xin[1U], exp.d, exp.z)) > 0) {
+			exp.d += nwr;
+			if ((size_t)nwr <= exp.z) {
+				exp.z -= nwr;
+			} else {
+				exp.z = 0;
+			}
+		}
+		if (write(xin[1U], "EOF\n", 4U) < 4U) {
+			goto fail;
+		}
+
+		/* we're done */
+		close(xin[1U]);
+
+		/* close all descriptors */
+		xclosefrom(0);
+
+		/* wait for child process */
+		with (int st) {
+			while (waitpid(sh, &st, 0) != sh);
+		}
+
+		/* and out, always succeed */
+		exit(EXIT_SUCCESS);
+	default:
+		/* i'm the parent */
+		break;
+	}
+	return feed;
+}
+
+static pid_t
+differ(struct clit_chld_s ctx[static 1], clit_bit_t exp, bool xpnd_proto_p)
 {
 #if !defined L_tmpnam
 # define L_tmpnam	(PATH_MAX)
@@ -747,7 +867,12 @@ differ(struct clit_chld_s ctx[static 1], clit_bit_t exp)
 
 		/* fork out the feeder guy */
 		if (clit_bit_buf_p(exp)) {
-			ctx->feed = feeder(exp, expfd);
+			/* check if we need the expander */
+			if (LIKELY(!xpnd_proto_p)) {
+				ctx->feed = feeder(exp, expfd);
+			} else {
+				ctx->feed = xpnder(exp, expfd);
+			}
 			close(expfd);
 		}
 		break;
@@ -800,9 +925,10 @@ init_tst(struct clit_chld_s ctx[static 1], struct clit_tst_s tst[static 1])
 	}
 
 	if (!tst->supp_diff) {
-		ctx->diff = differ(ctx, tst->out);
+		ctx->diff = differ(ctx, tst->out, tst->xpnd_proto);
 	} else {
 		ctx->diff = -1;
+		ctx->feed = -1;
 		ctx->pou = -1;
 	}
 
@@ -906,6 +1032,19 @@ run_tst(struct clit_chld_s ctx[static 1], struct clit_tst_s tst[static 1])
 		}
 	} else {
 		rc = 1;
+	}
+
+	/* wait for the feeder */
+	while (ctx->feed > 0 && waitpid(ctx->feed, &st, 0) != ctx->feed);
+	if (LIKELY(ctx->feed > 0 && WIFEXITED(st))) {
+		int tmp_rc = WEXITSTATUS(st);
+
+		if (tst->ign_out) {
+			/* don't worry */
+			;
+		} else if (tmp_rc > rc) {
+			rc = tmp_rc;
+		}
 	}
 
 	/* finally wait for the differ */

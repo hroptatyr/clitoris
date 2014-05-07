@@ -1,0 +1,7 @@
+#!/usr/bin/clitoris  ## -*- shell-script -*-
+
+$ $ echo "_ $(echo a) _"
+_ $(echo a) _
+$
+
+## expand_04.clit ends here
