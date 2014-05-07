@@ -159,11 +159,11 @@ operators:
 Controlling output
 ==================
 
-The ignore operator as introduced in the Syntax section above will still
-compare the output to the reference and print a diff.  To gain a more
-subtle control over what appears in the output use the (make-inspired)
-`@` built-in afront the command to bypass the diffing altogether (this
-implies `ignore-output` of course).
+The ignore operator as introduced in the Controlling behaviour section
+above will still compare the output to the reference and print a diff.
+To gain a more subtle control over what appears in the output use the
+(make-inspired) `@` built-in afront the command to bypass the diffing
+altogether (this implies `ignore-output` of course).
 
 A fabulous usecase is the included `hxdiff(1)` tool which itself prints
 a diff (of the hexdumps of two files), and thus avoids the confusion of
@@ -179,6 +179,37 @@ a reference file that contains zeroes only:
      00000000  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00   |................|
     -00000010  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00   |................|
     +00000010  00 01 00 00 00 00 00 00  00 00 00 00 00 00 00 00   |................|
+
+There is one more operator to aid generated prototypical output (the
+stuff that is compared against the dynamic output).  For instance, if
+the prototypical output, for some reason, has to contain values that
+change from run to run, user to user, or machine to machine (e.g. the
+current date, a user's home directory, or the hostname) you'll have no
+choice but to materialise these beforehand into a file and use that file
+as proto-output, as in:
+
+    $ echo "${HOST}" > hn.file
+    $ hostname-output-tool
+    < hn.file
+    $ -rm hn.file
+    $
+
+It would be easier if the proto-output could be expanded somehow like
+POSIX shell here-documents.  This is where the expander built-in (`$`)
+comes in handy, now you can write:
+
+    $ $ hostname-output-tool
+    ${HOST}
+    $
+
+and even though this looks slightly ugly it saves the hassle of
+temporary files (along with races should test files be executed in
+parallel) and pre-test/post-test actions that don't actually test
+functionality.
+
+The proto-output of a test that is flagged with the expander built-in
+(`$`) is treatest as though you passed a here-document to the diff
+process.
 
 
   [1]: http://expect.sourceforge.net/
