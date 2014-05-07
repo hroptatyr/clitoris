@@ -294,7 +294,19 @@ xpnd_clit_bit(clit_bit_t exp)
 			break;
 		case '(':
 			/* command or arith subst */
-			xp->we_wordc = 0;
+			if (!(on = memchr(dp + 2U, ')', ep - (dp + 2U)))) {
+				/* bullshit */
+				dp++;
+				continue;
+			} else if (on + 1U >= dp + sizeof(w)) {
+				/* not enough room for expansion */
+				dp++;
+				continue;
+			}
+			/* now then, copy to w-buf and perform expansion */
+			memcpy(w, dp, on + 1U - dp);
+			w[on + 1U - dp] = '\0';
+			wordexp(w, xp, 0);
 			break;
 		default:
 			/* bullshit, try param subst anyway */
@@ -781,6 +793,92 @@ feeder(clit_bit_t exp, int expfd)
 }
 
 static pid_t
+xpnder(clit_bit_t exp, int expfd)
+{
+	pid_t feed;
+
+	switch ((feed = fork())) {
+	case -1:
+		/* ah good then */
+		break;
+	case 0:;
+		/* i am the child */
+		ssize_t nwr;
+		int xin[2U];
+		pid_t sh;
+
+		if (UNLIKELY(pipe(xin) < 0)) {
+		fail:
+			/* whatever */
+			exit(EXIT_FAILURE);
+		}
+
+		switch ((sh = fork())) {
+			static char *const sh_args[] = {"sh", "-s", NULL};
+		case -1:
+			/* big fucking problem */
+			goto fail;
+		case 0:
+			/* close write end of pipe */
+			close(xin[1U]);
+			/* redir xin[0U] -> stdin */
+			dup2(xin[0U], STDIN_FILENO);
+			/* close read end of pipe */
+			close(xin[0U]);
+
+			/* redir stdout -> expfd */
+			dup2(expfd, STDOUT_FILENO);
+			/* close expfd */
+			close(expfd);
+
+			/* child again */
+			execv("/bin/sh", sh_args);
+			exit(EXIT_SUCCESS);
+		default:
+			/* parent i am */
+			close(xin[0U]);
+			/* also forget about expfd */
+			close(expfd);
+			break;
+		}
+
+		if (write(xin[1U], "cat <<EOF\n", 10U) < 10U) {
+			goto fail;
+		}
+		while (exp.z > 0 &&
+		       (nwr = write(xin[1U], exp.d, exp.z)) > 0) {
+			exp.d += nwr;
+			if ((size_t)nwr <= exp.z) {
+				exp.z -= nwr;
+			} else {
+				exp.z = 0;
+			}
+		}
+		if (write(xin[1U], "EOF\n", 4U) < 4U) {
+			goto fail;
+		}
+
+		/* we're done */
+		close(xin[1U]);
+
+		/* close all descriptors */
+		xclosefrom(0);
+
+		/* wait for child process */
+		with (int st) {
+			while (waitpid(sh, &st, 0) != sh);
+		}
+
+		/* and out, always succeed */
+		exit(EXIT_SUCCESS);
+	default:
+		/* i'm the parent */
+		break;
+	}
+	return feed;
+}
+
+static pid_t
 differ(struct clit_chld_s ctx[static 1], clit_bit_t exp)
 {
 #if !defined L_tmpnam
@@ -860,13 +958,11 @@ differ(struct clit_chld_s ctx[static 1], clit_bit_t exp)
 		if (clit_bit_buf_p(exp)) {
 			/* check if we need the expander */
 			if (ctx->expand_proto_p) {
-				exp = xpnd_clit_bit(exp);
+				ctx->feed = xpnder(exp, expfd);
+			} else {
+				ctx->feed = feeder(exp, expfd);
 			}
-			ctx->feed = feeder(exp, expfd);
 			close(expfd);
-			if (ctx->expand_proto_p) {
-				free_clit_bit(exp);
-			}
 		}
 		break;
 	clobrk:
