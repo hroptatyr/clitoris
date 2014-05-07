@@ -12,7 +12,7 @@ missing
 src/config.h.in
 *~
 =build*
-build*
+build/
 depcomp
 ++*
 Makefile
