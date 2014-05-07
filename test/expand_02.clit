@@ -1,8 +1,6 @@
 #!/usr/bin/clitoris  ## -*- shell-script -*-
 
-setopt expand-proto-output
-
-$ echo "${srcdir}"
+$ $ echo "${srcdir}"
 ${srcdir}
 $
 
