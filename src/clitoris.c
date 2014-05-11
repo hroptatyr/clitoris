@@ -1123,15 +1123,23 @@ prepend_path(const char *p)
 	pz = strlen(p);
 
 	if (UNLIKELY(paths == NULL)) {
-		char *envp = getenv("PATH");
-		size_t envz = strlen(envp);
+		size_t envz = 0UL;
+		char *envp;
+
+		if (LIKELY((envp = getenv("PATH")) != NULL)) {
+			envz = strlen(envp);
+			envp = strdup(envp);
+		}
 
 		/* get us a nice big cushion */
 		pathz = ((envz + pz + 1U/*\nul*/) / 256U + 2U) * 256U;
 		paths = malloc(pathz);
 		/* glue the current path at the end of the array */
 		pp = (paths + pathz) - (envz + 1U/*\nul*/);
-		memcpy(pp, envp, envz + 1U/*\nul*/);
+		if (LIKELY(envp != NULL)) {
+			memcpy(pp, envp, envz + 1U/*\nul*/);
+			free(envp);
+		}
 	}
 
 	/* calc prepension pointer */
@@ -1303,7 +1311,9 @@ main(int argc, char *argv[])
 	/* also bang builddir to path */
 	with (char *blddir = getenv("builddir")) {
 		if (LIKELY(blddir != NULL)) {
-			prepend_path(blddir);
+			char *_bd = strdup(blddir);
+			prepend_path(_bd);
+			free(_bd);
 		}
 	}
 
