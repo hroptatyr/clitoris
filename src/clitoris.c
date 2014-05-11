@@ -855,7 +855,7 @@ differ(struct clit_chld_s ctx[static 1], clit_bit_t exp, bool xpnd_proto_p)
 		int actfd = -1;
 
 		/* clean up descriptors */
-		if (!clit_bit_fn_p(exp) &&
+		if (clit_bit_buf_p(exp) &&
 		    (expfd = open(expfn, ofl, 0666)) < 0) {
 			goto clobrk;
 		} else if ((actfd = open(actfn, ofl, 0666)) < 0) {
@@ -873,6 +873,7 @@ differ(struct clit_chld_s ctx[static 1], clit_bit_t exp, bool xpnd_proto_p)
 			} else {
 				ctx->feed = xpnder(exp, expfd);
 			}
+			/* forget about expfd lest we leak it */
 			close(expfd);
 		}
 		break;
