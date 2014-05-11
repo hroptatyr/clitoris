@@ -979,7 +979,9 @@ init_tst(struct clit_chld_s ctx[static 1], struct clit_tst_s tst[static 1])
 		if (UNLIKELY(ctx->ptyp)) {
 			close(pin[1]);
 		}
-		close(ctx->pou);
+		if (LIKELY(ctx->pou >= 0)) {
+			close(ctx->pou);
+		}
 		ctx->pou = -1;
 
 		/* assign desc, write end of pin */
