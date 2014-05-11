@@ -875,6 +875,10 @@ differ(struct clit_chld_s ctx[static 1], clit_bit_t exp, bool xpnd_proto_p)
 			}
 			/* forget about expfd lest we leak it */
 			close(expfd);
+		} else {
+			/* best to let everyone know that we chose
+			 * not to use a feeder */
+			ctx->feed = -1;
 		}
 		break;
 	clobrk:
