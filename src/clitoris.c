@@ -217,7 +217,7 @@ bufexp(const char src[static 1], size_t ssz)
 	}
 
 #define CHKBSZ(x)				\
-	if ((x) > bsz) {			\
+	if ((x) >= bsz) {			\
 		bsz = ((x) / 256U + 1U) * 256U;	\
 		buf = realloc(buf, bsz);	\
 	}
