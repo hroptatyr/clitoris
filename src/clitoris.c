@@ -217,7 +217,7 @@ bufexp(const char src[static 1], size_t ssz)
 	}
 
 #define CHKBSZ(x)				\
-	if ((x) > bsz) {			\
+	if ((x) >= bsz) {			\
 		bsz = ((x) / 256U + 1U) * 256U;	\
 		buf = realloc(buf, bsz);	\
 	}
@@ -855,7 +855,7 @@ differ(struct clit_chld_s ctx[static 1], clit_bit_t exp, bool xpnd_proto_p)
 		int actfd = -1;
 
 		/* clean up descriptors */
-		if (!clit_bit_fn_p(exp) &&
+		if (clit_bit_buf_p(exp) &&
 		    (expfd = open(expfn, ofl, 0666)) < 0) {
 			goto clobrk;
 		} else if ((actfd = open(actfn, ofl, 0666)) < 0) {
@@ -873,6 +873,7 @@ differ(struct clit_chld_s ctx[static 1], clit_bit_t exp, bool xpnd_proto_p)
 			} else {
 				ctx->feed = xpnder(exp, expfd);
 			}
+			/* forget about expfd lest we leak it */
 			close(expfd);
 		}
 		break;
@@ -978,7 +979,9 @@ init_tst(struct clit_chld_s ctx[static 1], struct clit_tst_s tst[static 1])
 		if (UNLIKELY(ctx->ptyp)) {
 			close(pin[1]);
 		}
-		close(ctx->pou);
+		if (LIKELY(ctx->pou >= 0)) {
+			close(ctx->pou);
+		}
 		ctx->pou = -1;
 
 		/* assign desc, write end of pin */
@@ -1120,15 +1123,23 @@ prepend_path(const char *p)
 	pz = strlen(p);
 
 	if (UNLIKELY(paths == NULL)) {
-		char *envp = getenv("PATH");
-		size_t envz = strlen(envp);
+		size_t envz = 0UL;
+		char *envp;
+
+		if (LIKELY((envp = getenv("PATH")) != NULL)) {
+			envz = strlen(envp);
+			envp = strdup(envp);
+		}
 
 		/* get us a nice big cushion */
-		pathz = ((envz + pz + 1U) / 256U + 2U) * 256U;
+		pathz = ((envz + pz + 1U/*\nul*/) / 256U + 2U) * 256U;
 		paths = malloc(pathz);
 		/* glue the current path at the end of the array */
-		pp = (paths + pathz) - (envz + 1U);
-		memcpy(pp, envp, envz + 1U);
+		pp = (paths + pathz) - (envz + 1U/*\nul*/);
+		if (LIKELY(envp != NULL)) {
+			memcpy(pp, envp, envz + 1U/*\nul*/);
+			free(envp);
+		}
 	}
 
 	/* calc prepension pointer */
@@ -1137,7 +1148,7 @@ prepend_path(const char *p)
 	if (UNLIKELY(pp < paths)) {
 		/* awww, not enough space, is there */
 		ptrdiff_t ppoff = pp - paths;
-		size_t newsz = ((pathz + pz + 1U) / 256U + 1U) * 256U;
+		size_t newsz = ((pathz + pz + 1U/*:*/) / 256U + 1U) * 256U;
 
 		paths = realloc(paths, newsz);
 		/* memmove to the back */
@@ -1300,7 +1311,9 @@ main(int argc, char *argv[])
 	/* also bang builddir to path */
 	with (char *blddir = getenv("builddir")) {
 		if (LIKELY(blddir != NULL)) {
-			prepend_path(blddir);
+			char *_bd = strdup(blddir);
+			prepend_path(_bd);
+			free(_bd);
 		}
 	}
 
