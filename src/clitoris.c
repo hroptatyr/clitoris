@@ -843,7 +843,6 @@ differ(struct clit_chld_s ctx[static 1], clit_bit_t exp, bool xpnd_proto_p)
 		xclosefrom(STDERR_FILENO + 1);
 
 		execvp(cmd_diff, diff_opt);
-		error("exec'ing %s failed", cmd_diff);
 
 		/* just unlink the files the WRONLY is waiting for
 		 * ACTFN is always something that we create and unlink,
@@ -891,7 +890,7 @@ differ(struct clit_chld_s ctx[static 1], clit_bit_t exp, bool xpnd_proto_p)
 		}
 		break;
 	clobrk:
-		error("setting up differ failed");
+		error("exec'ing %s failed", cmd_diff);
 		if (expfd >= 0) {
 			close(expfd);
 		}
