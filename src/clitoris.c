@@ -303,10 +303,13 @@ bufexp(const char src[static 1], size_t ssz)
 		return NULL;
 	}
 
-#define CHKBSZ(x)				\
-	if ((x) >= bsz) {			\
-		bsz = ((x) / 256U + 1U) * 256U;	\
-		buf = realloc(buf, bsz);	\
+#define CHKBSZ(x)						   \
+	if ((x) >= bsz) {					   \
+		bsz = ((x) / 256U + 1U) * 256U;			   \
+		if (UNLIKELY((buf = realloc(buf, bsz)) == NULL)) { \
+			/* well we'll leak XP here */		   \
+			return NULL;				   \
+		}						   \
 	}
 
 	/* get our own copy for deep vein massages */
