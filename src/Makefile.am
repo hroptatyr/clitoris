@@ -27,7 +27,6 @@ libclit_a_SOURCES = version.c version.h
 
 bin_PROGRAMS += clitoris
 clitoris_CPPFLAGS = $(AM_CPPFLAGS)
-clitoris_CPPFLAGS += -D_GNU_SOURCE
 clitoris_LDFLAGS = $(AM_LDFLAGS)
 clitoris_LDADD = libclit.a
 if HAVE_PTY_H
@@ -70,7 +69,7 @@ dist-hook: $(bin_PROGRAMS)
 ## Create assembler output (debugging purposes only)
 .c.sa:
 	$(AM_V_GEN) clang -std=gnu99 --analyze \
-		$(AM_CFLAGS) $(AM_CPPFLAGS) -D_GNU_SOURCE \
+		$(AM_CFLAGS) $(AM_CPPFLAGS) \
 		-I$(builddir) -I$(srcdir) -DHAVE_CONFIG_H $< -o $@
 
 ## Makefile.am ends here
