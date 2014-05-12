@@ -843,7 +843,7 @@ differ(struct clit_chld_s ctx[static 1], clit_bit_t exp, bool xpnd_proto_p)
 		xclosefrom(STDERR_FILENO + 1);
 
 		execvp(cmd_diff, diff_opt);
-		error("execlp failed");
+		error("exec'ing %s failed", cmd_diff);
 		_exit(EXIT_FAILURE);
 
 	default:;
@@ -972,7 +972,7 @@ init_tst(struct clit_chld_s ctx[static 1], struct clit_tst_s tst[static 1])
 		xclosefrom(STDERR_FILENO + 1);
 
 		execl("/bin/sh", "sh", NULL);
-		error("execl failed");
+		error("exec'ing /bin/sh failed");
 		_exit(EXIT_FAILURE);
 
 	default:
