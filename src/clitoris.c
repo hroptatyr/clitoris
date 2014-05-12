@@ -844,6 +844,17 @@ differ(struct clit_chld_s ctx[static 1], clit_bit_t exp, bool xpnd_proto_p)
 
 		execvp(cmd_diff, diff_opt);
 		error("exec'ing %s failed", cmd_diff);
+
+		/* just unlink the files the WRONLY is waiting for
+		 * ACTFN is always something that we create and unlink,
+		 * so delete that one now to trigger an error in the
+		 * parent's open() code below */
+		unlink(actfn);
+		/* EXPFN is opened in the parent code below if it's
+		 * a fifo created by us, unlink that one to break the hang */
+		if (clit_bit_buf_p(exp)) {
+			unlink(expfn);
+		}
 		_exit(EXIT_FAILURE);
 
 	default:;
