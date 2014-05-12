@@ -838,7 +838,6 @@ differ(struct clit_chld_s ctx[static 1], clit_bit_t exp, bool xpnd_proto_p)
 
 		/* diff stdout -> stderr */
 		dup2(STDERR_FILENO, STDOUT_FILENO);
-		close(STDERR_FILENO);
 
 		/* close all other descriptors */
 		xclosefrom(STDERR_FILENO + 1);
