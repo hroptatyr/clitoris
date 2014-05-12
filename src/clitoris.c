@@ -303,10 +303,13 @@ bufexp(const char src[static 1], size_t ssz)
 		return NULL;
 	}
 
-#define CHKBSZ(x)				\
-	if ((x) >= bsz) {			\
-		bsz = ((x) / 256U + 1U) * 256U;	\
-		buf = realloc(buf, bsz);	\
+#define CHKBSZ(x)						   \
+	if ((x) >= bsz) {					   \
+		bsz = ((x) / 256U + 1U) * 256U;			   \
+		if (UNLIKELY((buf = realloc(buf, bsz)) == NULL)) { \
+			/* well we'll leak XP here */		   \
+			return NULL;				   \
+		}						   \
 	}
 
 	/* get our own copy for deep vein massages */
@@ -1199,14 +1202,23 @@ prepend_path(const char *p)
 
 			/* get us a nice big cushion */
 			pathz = ((envz + pz + 1U/*\nul*/) / 256U + 2U) * 256U;
-			paths = malloc(pathz);
-			/* glue the current path at the end of the array */
+			if (UNLIKELY((paths = malloc(pathz)) == NULL)) {
+				/* don't bother then */
+				return;
+			}
+			/* set pp for further reference */
 			pp = (paths + pathz) - (envz + 1U/*\nul*/);
-			memcpy(pp, envp, envz + 1U/*\nul*/);
+			/* glue the current path at the end of the array */
+			memccpy(pp, envp, '\0', envz);
+			/* terminate pp at least at the very end */
+			pp[envz] = '\0';
 		} else {
 			/* just alloc space for P */
 			pathz = ((pz + 1U/*\nul*/) / 256U + 2U) * 256U;
-			paths = malloc(pathz);
+			if (UNLIKELY((paths = malloc(pathz)) == NULL)) {
+				/* don't bother then */
+				return;
+			}
 			/* set pp for further reference */
 			pp = (paths + pathz) - (pz + 1U/*\nul*/);
 			/* copy P and then exit */
@@ -1223,7 +1235,10 @@ prepend_path(const char *p)
 		ptrdiff_t ppoff = pp - paths;
 		size_t newsz = ((pathz + pz + 1U/*:*/) / 256U + 1U) * 256U;
 
-		paths = realloc(paths, newsz);
+		if (UNLIKELY((paths = realloc(paths, newsz)) == NULL)) {
+			/* just leave things be */
+			return;
+		}
 		/* memmove to the back */
 		memmove(paths + (newsz - pathz), paths, pathz);
 		/* recalc paths pointer */
@@ -1385,9 +1400,12 @@ main(int argc, char *argv[])
 	/* also bang builddir to path */
 	with (char *blddir = getenv("builddir")) {
 		if (LIKELY(blddir != NULL)) {
-			char *_bd = strdup(blddir);
-			prepend_path(_bd);
-			free(_bd);
+			/* use at most 256U bytes for blddir */
+			char _blddir[256U];
+
+			memccpy(_blddir, blddir, '\0', sizeof(_blddir) - 1U);
+			_blddir[sizeof(_blddir) - 1U] = '\0';
+			prepend_path(_blddir);
 		}
 	}
 
