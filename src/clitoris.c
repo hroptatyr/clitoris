@@ -1199,7 +1199,10 @@ prepend_path(const char *p)
 
 			/* get us a nice big cushion */
 			pathz = ((envz + pz + 1U/*\nul*/) / 256U + 2U) * 256U;
-			paths = malloc(pathz);
+			if (UNLIKELY((paths = malloc(pathz)) == NULL)) {
+				/* don't bother then */
+				return;
+			}
 			/* set pp for further reference */
 			pp = (paths + pathz) - (envz + 1U/*\nul*/);
 			/* glue the current path at the end of the array */
@@ -1209,7 +1212,10 @@ prepend_path(const char *p)
 		} else {
 			/* just alloc space for P */
 			pathz = ((pz + 1U/*\nul*/) / 256U + 2U) * 256U;
-			paths = malloc(pathz);
+			if (UNLIKELY((paths = malloc(pathz)) == NULL)) {
+				/* don't bother then */
+				return;
+			}
 			/* set pp for further reference */
 			pp = (paths + pathz) - (pz + 1U/*\nul*/);
 			/* copy P and then exit */
@@ -1226,7 +1232,10 @@ prepend_path(const char *p)
 		ptrdiff_t ppoff = pp - paths;
 		size_t newsz = ((pathz + pz + 1U/*:*/) / 256U + 1U) * 256U;
 
-		paths = realloc(paths, newsz);
+		if (UNLIKELY((paths = realloc(paths, newsz)) == NULL)) {
+			/* just leave things be */
+			return;
+		}
 		/* memmove to the back */
 		memmove(paths + (newsz - pathz), paths, pathz);
 		/* recalc paths pointer */
