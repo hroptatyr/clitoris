@@ -47,6 +47,8 @@ AX_CHECK_YUCK
 AC_CHECK_HEADERS([pty.h])
 AM_CONDITIONAL([HAVE_PTY_H], [test "${ac_cv_header_pty_h}" = "yes"])
 
+AC_CHECK_FUNCS([splice])
+
 
 AC_CONFIG_FILES([Makefile])
 AC_CONFIG_FILES([build-aux/Makefile])

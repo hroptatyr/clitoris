@@ -1143,13 +1143,15 @@ wait:
 
 	/* also connect per's out end with stderr */
 	if (UNLIKELY(ctx->ptyp)) {
-#if !defined SPLICE_F_MOVE
-# define SPLICE_F_MOVE		(0)
-#endif	/* SPLICE_F_MOVE */
+# if defined HAVE_SPLICE
+#  if !defined SPLICE_F_MOVE
+#   define SPLICE_F_MOVE		(0)
+#  endif  /* SPLICE_F_MOVE */
 		for (ssize_t nsp;
 		     (nsp = splice(
 			      ctx->per, NULL, STDERR_FILENO, NULL,
 			      4096U, SPLICE_F_MOVE)) == 4096U;);
+# endif	/* HAVE_SPLICE */
 		close(ctx->per);
 	}
 #endif	/* HAVE_PTY_H */
