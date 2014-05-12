@@ -927,6 +927,14 @@ init_tst(struct clit_chld_s ctx[static 1], struct clit_tst_s tst[static 1])
 		ctx->test_id = (unsigned int)(tv->tv_sec ^ tv->tv_usec);
 	}
 
+	if (!tst->supp_diff) {
+		ctx->diff = differ(ctx, tst->out, tst->xpnd_proto);
+	} else {
+		ctx->diff = -1;
+		ctx->feed = -1;
+		ctx->pou = -1;
+	}
+
 	if (0) {
 		;
 	} else if (UNLIKELY(pipe(pin) < 0)) {
@@ -935,14 +943,6 @@ init_tst(struct clit_chld_s ctx[static 1], struct clit_tst_s tst[static 1])
 	} else if (UNLIKELY(ctx->ptyp && pipe(per) < 0)) {
 		ctx->chld = -1;
 		return -1;
-	}
-
-	if (!tst->supp_diff) {
-		ctx->diff = differ(ctx, tst->out, tst->xpnd_proto);
-	} else {
-		ctx->diff = -1;
-		ctx->feed = -1;
-		ctx->pou = -1;
 	}
 
 	block_sigs();
@@ -1016,7 +1016,8 @@ run_tst(struct clit_chld_s ctx[static 1], struct clit_tst_s tst[static 1])
 	int st;
 
 	if (UNLIKELY(init_tst(ctx, tst) < 0)) {
-		return -1;
+		rc = -1;
+		goto wait;
 	}
 	with (const char *p = tst->cmd.d, *const ep = tst->cmd.d + tst->cmd.z) {
 		for (ssize_t nwr;
@@ -1049,6 +1050,7 @@ run_tst(struct clit_chld_s ctx[static 1], struct clit_tst_s tst[static 1])
 		rc = 1;
 	}
 
+wait:
 	/* wait for the feeder */
 	while (ctx->feed > 0 && waitpid(ctx->feed, &st, 0) != ctx->feed);
 	if (LIKELY(ctx->feed > 0 && WIFEXITED(st))) {
