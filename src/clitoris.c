@@ -635,29 +635,6 @@ fini_chld(struct clit_chld_s ctx[static 1] __attribute__((unused)))
 }
 
 static void
-xclosefrom(int fd)
-{
-#if defined F_CLOSEM
-	fcntl(fd, F_CLOSEM, 0);
-#elif defined closefrom
-	closefrom(fd);
-#else  /* !F_CLOSEM */
-	with (const int maxfd = sysconf(_SC_OPEN_MAX)) {
-		for (int i = fd; i < maxfd; i++) {
-			int fl;
-
-			if ((fl = fcntl(i, F_GETFD)) < 0) {
-				/* nothing */
-				continue;
-			}
-			close(i);
-		}
-	}
-#endif	/* F_CLOSEM */
-	return;
-}
-
-static void
 mkfifofn(char *restrict buf, size_t bsz, const char *key, unsigned int tid)
 {
 	snprintf(buf, bsz, "%s output  %x", key, tid);
@@ -689,9 +666,6 @@ feeder(clit_bit_t exp, int expfd)
 
 		/* we're done */
 		close(expfd);
-
-		/* close all descriptors */
-		xclosefrom(0);
 
 		/* and out, always succeed */
 		exit(EXIT_SUCCESS);
@@ -771,9 +745,6 @@ xpnder(clit_bit_t exp, int expfd)
 		/* we're done */
 		close(xin[1U]);
 
-		/* close all descriptors */
-		xclosefrom(0);
-
 		/* wait for child process */
 		with (int st) {
 			while (waitpid(sh, &st, 0) != sh);
@@ -838,9 +809,6 @@ differ(struct clit_chld_s ctx[static 1], clit_bit_t exp, bool xpnd_proto_p)
 
 		/* diff stdout -> stderr */
 		dup2(STDERR_FILENO, STDOUT_FILENO);
-
-		/* close all other descriptors */
-		xclosefrom(STDERR_FILENO + 1);
 
 		execvp(cmd_diff, diff_opt);
 
@@ -977,9 +945,6 @@ init_tst(struct clit_chld_s ctx[static 1], struct clit_tst_s tst[static 1])
 			dup2(ctx->pou, STDOUT_FILENO);
 			close(ctx->pou);
 		}
-
-		/* close all other descriptors */
-		xclosefrom(STDERR_FILENO + 1);
 
 		execl("/bin/sh", "sh", NULL);
 		error("exec'ing /bin/sh failed");
