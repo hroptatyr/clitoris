@@ -1112,7 +1112,7 @@ prepend_path(const char *p)
 #define free_path()	prepend_path(NULL);
 	static char *paths;
 	static size_t pathz;
-	static char *pp;
+	static char *restrict pp;
 	size_t pz;
 
 	if (UNLIKELY(p == NULL)) {
@@ -1127,22 +1127,26 @@ prepend_path(const char *p)
 	pz = strlen(p);
 
 	if (UNLIKELY(paths == NULL)) {
-		size_t envz = 0UL;
 		char *envp;
 
 		if (LIKELY((envp = getenv("PATH")) != NULL)) {
-			envz = strlen(envp);
-			envp = strdup(envp);
-		}
+			const size_t envz = strlen(envp);
 
-		/* get us a nice big cushion */
-		pathz = ((envz + pz + 1U/*\nul*/) / 256U + 2U) * 256U;
-		paths = malloc(pathz);
-		/* glue the current path at the end of the array */
-		pp = (paths + pathz) - (envz + 1U/*\nul*/);
-		if (LIKELY(envp != NULL)) {
+			/* get us a nice big cushion */
+			pathz = ((envz + pz + 1U/*\nul*/) / 256U + 2U) * 256U;
+			paths = malloc(pathz);
+			/* glue the current path at the end of the array */
+			pp = (paths + pathz) - (envz + 1U/*\nul*/);
 			memcpy(pp, envp, envz + 1U/*\nul*/);
-			free(envp);
+		} else {
+			/* just alloc space for P */
+			pathz = ((pz + 1U/*\nul*/) / 256U + 2U) * 256U;
+			paths = malloc(pathz);
+			/* set pp for further reference */
+			pp = (paths + pathz) - (pz + 1U/*\nul*/);
+			/* copy P and then exit */
+			memcpy(pp, p, pz + 1U/*\nul*/);
+			goto out;
 		}
 	}
 
@@ -1165,6 +1169,7 @@ prepend_path(const char *p)
 	/* actually prepend now */
 	memcpy(pp, p, pz);
 	pp[pz] = ':';
+out:
 	setenv("PATH", pp, 1);
 	return;
 }
