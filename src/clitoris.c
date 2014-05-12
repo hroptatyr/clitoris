@@ -171,6 +171,94 @@ error(const char *fmt, ...)
 	return;
 }
 
+static inline __attribute__((const, pure, always_inline)) char*
+deconst(const char *s)
+{
+	union {
+		const char *c;
+		char *p;
+	} x = {s};
+	return x.p;
+}
+
+
+/* imported code */
+/*** fast_strstr.c
+ *
+ * This algorithm is licensed under the open-source BSD3 license
+ *
+ * Copyright (c) 2014, Raphael Javaux
+ * All rights reserved.
+ *
+ * Licence text, see above.
+ *
+ * The code has been modified to mimic memmem().
+ *
+ **/
+/**
+* Finds the first occurrence of the sub-string needle in the string haystack.
+* Returns NULL if needle was not found.
+*/
+static char*
+xmemmem(const char *haystack, size_t hz, const char *needle, size_t nz)
+{
+	const char *const eoh = haystack + hz;
+	const char *const eon = needle + nz;
+	const char *hp;
+	const char *np;
+	unsigned int hsum;
+	unsigned int nsum;
+	bool identicalp;
+
+	/* trivial checks first
+         * a 0-sized needle is defined to be found anywhere in haystack
+         * then run strchr() to find a candidate in HAYSTACK (i.e. a portion
+         * that happens to begin with *NEEDLE) */
+	if (UNLIKELY(nz == 0UL)) {
+		return deconst(haystack);
+	} else if ((haystack = memchr(haystack, *needle, hz)) == NULL) {
+		/* trivial */
+		return NULL;
+	}
+
+	/* First characters of haystack and needle are the same now. Both are
+	 * guaranteed to be at least one character long.  Now computes the sum
+	 * of characters values of needle together with the sum of the first
+	 * needle_len characters of haystack. */
+	for (hp = haystack + 1U, np = needle + 1U,
+		     hsum = *haystack, nsum = *haystack,
+		     identicalp = true;
+	     hp < eoh && np < eon;
+	     hsum += *hp, nsum += *np, identicalp = *hp == *np, hp++, np++);
+
+	/* HP now references the (NZ + 1)-th character. */
+	if (np < eon) {
+		/* haystack is smaller than needle, :O */
+		return NULL;
+	} else if (identicalp) {
+		/* found a match */
+		return deconst(haystack);
+	}
+
+	/* now loop through the rest of haystack,
+	 * updating the sum iteratively */
+	for (const char *cand = haystack; hp < eoh; hp++) {
+		hsum -= *cand++;
+		hsum += *hp;
+
+		/* Since the sum of the characters is already known to be
+		 * equal at that point, it is enough to check just NZ - 1
+		 * characters for equality,
+		 * also CAND is by design < HP, so no need for range checks */
+		if (hsum == nsum && memcmp(cand, needle, nz - 1U) == 0) {
+			return deconst(cand);
+		}
+	}
+	return NULL;
+}
+
+
+/* clit bit handling */
 #define CLIT_BIT_FD(x)	(clit_bit_fd_p(x) ? (int)(x).z : -1)
 
 static inline __attribute__((const, pure)) bool
@@ -359,12 +447,12 @@ find_cmd(const char *bp, size_t bz)
 		size_t lz = (res + 1U - bp);
 
 		/* check for trailing \ or <<EOF (in that line) */
-		if (UNLIKELY((tok.d = memmem(bp, lz, "<<", 2)) != NULL)) {
+		if (UNLIKELY((tok.d = xmemmem(bp, lz, "<<", 2U)) != NULL)) {
 			tok.d += 2U;
 			tok.z = res - tok.d;
 			/* analyse this eof token */
 			bp = res + 1U;
-			goto eof;
+			goto here_doc;
 		} else if (res == bp || res[-1] != '\\') {
 			resbit.z = res + 1 - resbit.d;
 			break;
@@ -372,7 +460,7 @@ find_cmd(const char *bp, size_t bz)
 	}
 	return resbit;
 
-eof:
+here_doc:
 	/* massage tok so that it starts on a non-space and ends on one */
 	for (; tok.z && (*tok.d == ' ' || *tok.d == '\t'); tok.d++, tok.z--);
 	for (;
@@ -385,7 +473,7 @@ eof:
 	}
 	/* now find the opposite EOF token */
 	for (const char *eotok;
-	     (eotok = memmem(bp, bz, tok.d, tok.z)) != NULL;
+	     (eotok = xmemmem(bp, bz, tok.d, tok.z)) != NULL;
 	     bz -= eotok + 1U - bp, bp = eotok + 1U) {
 		if (LIKELY(eotok[-1] == '\n' && eotok[tok.z] == '\n')) {
 			resbit.z = eotok + tok.z + 1U - resbit.d;
@@ -571,7 +659,7 @@ find_opt(struct clit_chld_s ctx[static 1], const char *bp, size_t bz)
 	static const char magic[] = "setopt ";
 
 	for (const char *mp;
-	     (mp = memmem(bp, bz, magic, sizeof(magic) - 1)) != NULL;
+	     (mp = xmemmem(bp, bz, magic, sizeof(magic) - 1U)) != NULL;
 	     bz -= (mp + 1U) - bp, bp = mp + 1U) {
 		unsigned int opt;
 
