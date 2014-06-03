@@ -8,18 +8,29 @@ LC_ALL=C
 
 BUILT_SOURCES =
 BUILT_MANS =
-EXTRA_DIST = $(BUILT_SOURCES) $(BUILT_MANS)
+EXTRA_DIST = $(BUILT_SOURCES)
+EXTRA_DIST += $(man1_MANS)
+SUFFIXES =
 
 man1_MANS =
-man1_MANS += $(BUILT_MANS)
+man1_MANS += $(built_men)
 
-BUILT_MANS += clitoris.man
-BUILT_MANS += hxdiff.man
-BUILT_MANS += shack.man
+built_men =
+built_men += clitoris.man
+built_men += hxdiff.man
+built_men += shack.man
 
-## help2man helpers
-%.man: $(top_srcdir)/src/%.yuck $(top_srcdir)/configure $(top_builddir)/version.mk
-	$(AM_V_GEN) PATH=$(top_builddir)/build-aux:"$${PATH}" \
-		yuck genman --version-string=$(VERSION) -o $@ $<
+BUILT_SOURCES += $(built_men)
+EXTRA_DIST += author.h2m
+
+VPATH += @top_srcdir@/src
+SUFFIXES += .yuck
+SUFFIXES += .man
+.yuck.man:
+	$(AM_V_GEN) PATH="$(top_builddir)/build-aux:$${PATH}" \
+		yuck$(EXEEXT) genman \
+			--package "$(PACKAGE_NAME)" \
+			-i "$(srcdir)/author.h2m" \
+			-o $@ --version-file "$(top_builddir)/.version" $<
 
 ## Makefile.am ends here
