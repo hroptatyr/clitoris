@@ -2,7 +2,7 @@
 title: clitoris
 project: clitoris
 layout: project
-latest: https://github.com/hroptatyr/clitoris/releases/download/v0.2.1/clitoris-0.2.1.tar.xz
+latest: https://github.com/hroptatyr/clitoris/releases/download/v0.2.2/clitoris-0.2.2.tar.xz
 ---
 
 clitoris
