@@ -1072,6 +1072,12 @@ run_tst(struct clit_chld_s ctx[static 1], struct clit_tst_s tst[static 1])
 
 	if (UNLIKELY(init_tst(ctx, tst) < 0)) {
 		rc = -1;
+		if (ctx->feed > 0) {
+			kill(ctx->feed, SIGTERM);
+		}
+		if (ctx->diff > 0) {
+			kill(ctx->diff, SIGTERM);
+		}
 		goto wait;
 	}
 	with (const char *p = tst->cmd.d, *const ep = tst->cmd.d + tst->cmd.z) {
