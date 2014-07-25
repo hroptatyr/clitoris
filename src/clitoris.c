@@ -200,10 +200,10 @@ deconst(const char *s)
 * Returns NULL if needle was not found.
 */
 static char*
-xmemmem(const char *hay, const size_t hz, const char *ndl, const size_t nz)
+xmemmem(const char *hay, const size_t hayz, const char *ndl, const size_t ndlz)
 {
-	const char *const eoh = hay + hz;
-	const char *const eon = ndl + nz;
+	const char *const eoh = hay + hayz;
+	const char *const eon = ndl + ndlz;
 	const char *hp;
 	const char *np;
 	const char *cand;
@@ -215,9 +215,9 @@ xmemmem(const char *hay, const size_t hz, const char *ndl, const size_t nz)
          * a 0-sized needle is defined to be found anywhere in haystack
          * then run strchr() to find a candidate in HAYSTACK (i.e. a portion
          * that happens to begin with *NEEDLE) */
-	if (nz == 0UL) {
+	if (ndlz == 0UL) {
 		return deconst(hay);
-	} else if ((hay = memchr(hay, *ndl, hz)) == NULL) {
+	} else if ((hay = memchr(hay, *ndl, hayz)) == NULL) {
 		/* trivial */
 		return NULL;
 	}
@@ -249,7 +249,7 @@ xmemmem(const char *hay, const size_t hz, const char *ndl, const size_t nz)
 		 * equal at that point, it is enough to check just NZ - 1
 		 * characters for equality,
 		 * also CAND is by design < HP, so no need for range checks */
-		if (hsum == nsum && memcmp(cand, ndl, nz - 1U) == 0) {
+		if (hsum == nsum && memcmp(cand, ndl, ndlz - 1U) == 0) {
 			return deconst(cand);
 		}
 	}
