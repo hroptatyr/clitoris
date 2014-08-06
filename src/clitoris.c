@@ -816,7 +816,7 @@ xpnder(clit_bit_t exp, int expfd)
 			break;
 		}
 
-		if (write(xin[1U], "cat <<EOF\n", 10U) < 10U) {
+		if (write(xin[1U], "cat <<EOF\n", 10U) < 10) {
 			goto fail;
 		}
 		while (exp.z > 0 &&
@@ -828,7 +828,7 @@ xpnder(clit_bit_t exp, int expfd)
 				exp.z = 0;
 			}
 		}
-		if (write(xin[1U], "EOF\n", 4U) < 4U) {
+		if (write(xin[1U], "EOF\n", 4U) < 4) {
 			goto fail;
 		}
 
