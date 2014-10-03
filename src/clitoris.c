@@ -1115,8 +1115,7 @@ run_tst(struct clit_chld_s ctx[static 1], struct clit_tst_s tst[static 1])
 		} else if (tst->exp_ret == 255U && rc) {
 			rc = 0;
 		} else {
-			/* keep the test's rc */
-			rc = rc;
+			rc = 1;
 		}
 	} else {
 		rc = 1;
