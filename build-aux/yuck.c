@@ -37,6 +37,16 @@
 #if defined HAVE_CONFIG_H
 # include "config.h"
 #endif	/* HAVE_CONFIG_H */
+/* for fgetln() */
+#if !defined _NETBSD_SOURCE
+# define _NETBSD_SOURCE
+#endif	/* !_NETBSD_SOURCE */
+#if !defined _DARWIN_SOURCE
+# define _DARWIN_SOURCE
+#endif	/* !_DARWIN_SOURCE */
+#if !defined _ALL_SOURCE
+# define _ALL_SOURCE
+#endif	/* !_ALL_SOURCE */
 #include <unistd.h>
 #include <stdarg.h>
 #include <stdlib.h>
@@ -294,11 +304,15 @@ unmassage_buf(char *restrict buf, size_t bsz)
 static int
 mktempp(char *restrict tmpl[static 1U], int prefixlen)
 {
+	static mode_t umsk;
 	char *bp = *tmpl + prefixlen;
 	char *const ep = *tmpl + strlen(*tmpl);
 	mode_t m;
 	int fd;
 
+	if (UNLIKELY(!umsk)) {
+		umsk = umask(0022);
+	}
 	if (ep[-6] != 'X' || ep[-5] != 'X' || ep[-4] != 'X' ||
 	    ep[-3] != 'X' || ep[-2] != 'X' || ep[-1] != 'X') {
 		if ((fd = open(bp, O_RDWR | O_CREAT | O_EXCL, 0666)) < 0 &&
@@ -528,7 +542,7 @@ optionp(const char *line, size_t llen)
 			sp += 7U;
 		}
 	}
-	if ((sp - line >= 8 || sp - line >= 1 && *sp != '-') &&
+	if ((sp - line >= 8 || (sp - line >= 1 && *sp != '-')) &&
 	    (cur_opt.sopt || cur_opt.lopt)) {
 		/* should be description */
 		goto desc;
@@ -1213,7 +1227,7 @@ unmassage_fd(int tgtfd, int srcfd)
 
 
 static char *m4_cmdline[16U] = {
-	"m4",
+	YUCK_M4,
 };
 static size_t cmdln_idx;
 
@@ -1520,8 +1534,8 @@ wr_man_include(char **const inc)
 		wr_man_incln(ofp, line, nrd);
 	}
 #elif defined HAVE_FGETLN
-	while ((line = fgetln(f, &llen)) != NULL) {
-		wr_man_incln(ofp, line, nrd);
+	while ((line = fgetln(fp, &llen)) != NULL) {
+		wr_man_incln(ofp, line, llen);
 	}
 #else
 # error neither getline() nor fgetln() available, cannot read file line by line
@@ -1569,7 +1583,8 @@ wr_version(const struct yuck_version_s *v, const char *vlit)
 		fprintf(outf, "define([YUCK_SCMVER_VTAG], [%s])\n", v->vtag);
 		fprintf(outf, "define([YUCK_SCMVER_SCM], [%s])\n", yscm);
 		fprintf(outf, "define([YUCK_SCMVER_DIST], [%u])\n", v->dist);
-		fprintf(outf, "define([YUCK_SCMVER_RVSN], [%08x])\n", v->rvsn);
+		fprintf(outf, "define([YUCK_SCMVER_RVSN], [%0*x])\n",
+			(int)(v->rvsn & 0x07U), v->rvsn >> 4U);
 		if (!v->dirty) {
 			fputs("define([YUCK_SCMVER_FLAG_CLEAN])\n", outf);
 		} else {
@@ -1582,7 +1597,9 @@ wr_version(const struct yuck_version_s *v, const char *vlit)
 		if (v->scm > YUCK_SCM_TARBALL && v->dist) {
 			fputc('.', outf);
 			fputs(yscm_strs[v->scm], outf);
-			fprintf(outf, "%u.%08x", v->dist, v->rvsn);
+			fprintf(outf, "%u.%0*x",
+				v->dist,
+				(int)(v->rvsn & 0x07U), v->rvsn >> 4U);
 		}
 		if (v->dirty) {
 			fputs(".dirty", outf);
@@ -1696,18 +1713,19 @@ cmd_gen(const struct yuck_cmd_gen_s argi[static 1U])
 		goto out;
 	}
 	/* now route that stuff through m4 */
-	with (const char *outfn = argi->output_arg, *hdrfn) {
+	with (const char *outfn = argi->output_arg,
+	      *cusfn = argi->custom_arg ?: "/dev/null", *hdrfn) {
 		if ((hdrfn = argi->header_arg) != NULL) {
 			/* run a special one for the header */
 			if ((rc = run_m4(hdrfn, dslfn, deffn, genhfn, NULL))) {
 				break;
 			}
 			/* now run the whole shebang for the beef code */
-			rc = run_m4(outfn, dslfn, deffn, gencfn, NULL);
+			rc = run_m4(outfn, dslfn, deffn, cusfn, gencfn, NULL);
 			break;
 		}
 		/* standard case: pipe directives, then header, then code */
-		rc = run_m4(outfn, dslfn, deffn, genhfn, gencfn, NULL);
+		rc = run_m4(outfn, dslfn, deffn, cusfn, genhfn, gencfn, NULL);
 	}
 out:
 	/* unlink include files */
@@ -1905,7 +1923,9 @@ flag -n|--use-reference requires -r|--reference parameter");
 		if (v->scm > YUCK_SCM_TARBALL && v->dist) {
 			fputc('.', stdout);
 			fputs(yscm_strs[v->scm], stdout);
-			fprintf(stdout, "%u.%08x", v->dist, v->rvsn);
+			fprintf(stdout, "%u.%0*x",
+				v->dist,
+				(int)(v->rvsn & 0x07U), v->rvsn >> 4U);
 		}
 		if (v->dirty) {
 			fputs(".dirty", stdout);
@@ -1917,6 +1937,24 @@ flag -n|--use-reference requires -r|--reference parameter");
 	fputs("scmver support not built in\n", stderr);
 	return argi->cmd == YUCK_CMD_SCMVER;
 #endif	/* WITH_SCMVER */
+}
+
+static int
+cmd_config(const struct yuck_cmd_config_s argi[static 1U])
+{
+	const char *const fn = argi->output_arg;
+	FILE *of = stdout;
+
+	if (fn != NULL && (of = fopen(fn, "w")) == NULL) {
+		error("cannot open file `%s'", fn);
+		return -1;
+	}
+
+	if (argi->m4_flag) {
+		fputs(YUCK_M4, of);
+		fputc('\n', of);
+	}
+	return fclose(of);
 }
 
 int
@@ -1954,6 +1992,11 @@ See --help to obtain a list of available commands.\n", stderr);
 		break;
 	case YUCK_CMD_SCMVER:
 		if ((rc = cmd_scmver((const void*)argi)) < 0) {
+			rc = 1;
+		}
+		break;
+	case YUCK_CMD_CONFIG:
+		if ((rc = cmd_config((const void*)argi)) < 0) {
 			rc = 1;
 		}
 		break;
