@@ -1,4 +1,4 @@
 #include "config.h"
 #include "version.h"
 
-const char clitoris_version_string[] = PACKAGE " @VERSION@";
+const char clitoris_version_string[] = PACKAGE " YUCK_SCMVER_VERSION";
