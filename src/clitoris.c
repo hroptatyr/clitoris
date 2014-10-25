@@ -1270,10 +1270,7 @@ out:
 }
 
 
-static int verbosep;
-static int ptyp;
-static int keep_going_p;
-static unsigned int timeo;
+static struct clit_chld_s proto;
 
 static int
 test_f(clitf_t tf)
@@ -1288,17 +1285,8 @@ test_f(clitf_t tf)
 		return -1;
 	}
 
-	/* preset options */
-	if (verbosep) {
-		ctx->verbosep = 1U;
-	}
-	if (ptyp) {
-		ctx->ptyp = 1U;
-	}
-	if (keep_going_p) {
-		ctx->keep_going_p = 1U;
-	}
-	ctx->timeo = timeo;
+	/* preset options from proto child */
+	*ctx = proto;
 
 	/* find options in the test script */
 	find_opt(ctx, bp, bz);
@@ -1386,16 +1374,16 @@ main(int argc, char *argv[])
 		setenv("husk", argi->husk_arg, 1);
 	}
 	if (argi->verbose_flag) {
-		verbosep = 1U;
+		proto.verbosep = 1U;
 	}
 	if (argi->pseudo_tty_flag) {
-		ptyp = 1U;
+		proto.ptyp = 1U;
 	}
 	if (argi->timeout_arg) {
-		timeo = strtoul(argi->timeout_arg, NULL, 10);
+		proto.timeo = strtoul(argi->timeout_arg, NULL, 10);
 	}
 	if (argi->keep_going_flag) {
-		keep_going_p = 1U;
+		proto.keep_going_p = 1U;
 	}
 	if (argi->diff_arg) {
 		cmd_diff = argi->diff_arg;
