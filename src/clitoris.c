@@ -120,6 +120,9 @@ struct clit_chld_s {
 	unsigned int keep_going_p:1;
 
 	unsigned int timeo;
+
+	/* prepend this in front of /bin/sh */
+	char **huskv;
 };
 
 /* a test is the command (inlcuding stdin), stdout result, and stderr result */
@@ -1046,7 +1049,21 @@ init_tst(struct clit_chld_s ctx[static 1], struct clit_tst_s tst[static 1])
 			close(ctx->pou);
 		}
 
-		execl("/bin/sh", "sh", NULL);
+		if (!ctx->huskv) {
+			execl("/bin/sh", "sh", NULL);
+		} else {
+			size_t n = 0U;
+			for (const char *const *hp = ctx->huskv; *hp; hp++, n++);
+			if (UNLIKELY((n + 2U) / 16U != n / 16U)) {
+				/* realloc huskv */
+				size_t nu = (n / 16U + 1U) * 16U;
+				ctx->huskv = realloc(
+					ctx->huskv, nu * sizeof(*ctx->huskv));
+			}
+			ctx->huskv[n++] = "/bin/sh";
+			ctx->huskv[n] = NULL;
+			execvp(*ctx->huskv, ctx->huskv);
+		}
 		error("exec'ing /bin/sh failed");
 		_exit(EXIT_FAILURE);
 
@@ -1269,6 +1286,23 @@ out:
 	return;
 }
 
+static char**
+cmdify(char *restrict cmd)
+{
+	/* prep for about 16 params */
+	char **v = calloc(16U, sizeof(*v));
+	size_t i = 0U;
+	const char *ifs = getenv("IFS") ?: " \t\n";
+
+	v[0U] = strtok(cmd, ifs);
+	do {
+		if (UNLIKELY((i % 16U) == 15U)) {
+			v = realloc(v, (i + 1U + 16U) * sizeof(*v));
+		}
+	} while ((v[++i] = strtok(NULL, ifs)) != NULL);
+	return v;
+}
+
 
 static struct clit_chld_s proto;
 
@@ -1371,7 +1405,7 @@ main(int argc, char *argv[])
 		setenv("hash", argi->hash_arg, 1);
 	}
 	if (argi->husk_arg) {
-		setenv("husk", argi->husk_arg, 1);
+		proto.huskv = cmdify(argi->husk_arg);
 	}
 	if (argi->verbose_flag) {
 		proto.verbosep = 1U;
