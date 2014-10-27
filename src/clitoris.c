@@ -259,6 +259,23 @@ xmemmem(const char *hay, const size_t hayz, const char *ndl, const size_t ndlz)
 	return NULL;
 }
 
+static char**
+cmdify(char *restrict cmd)
+{
+	/* prep for about 16 params */
+	char **v = calloc(16U, sizeof(*v));
+	size_t i = 0U;
+	const char *ifs = getenv("IFS") ?: " \t\n";
+
+	v[0U] = strtok(cmd, ifs);
+	do {
+		if (UNLIKELY((i % 16U) == 15U)) {
+			v = realloc(v, (i + 1U + 16U) * sizeof(*v));
+		}
+	} while ((v[++i] = strtok(NULL, ifs)) != NULL);
+	return v;
+}
+
 
 /* clit bit handling */
 #define CLIT_BIT_FD(x)	(clit_bit_fd_p(x) ? (int)(x).z : -1)
@@ -699,6 +716,17 @@ find_opt(struct clit_chld_s ctx[static 1], const char *bp, size_t bz)
 			}
 		} else if (CMP(mp, "keep-going\n") == 0) {
 			ctx->keep_going_p = opt;
+		} else if (CMP(mp, "shell") == 0) {
+			const char *arg = mp + sizeof("shell");
+			char *eol = memchr(arg, '\n', bz - (arg - mp));
+			char *cmd;
+
+			if (UNLIKELY(eol == NULL)) {
+				/* ignore and get on with it */
+				continue;
+			}
+			cmd = strndup(arg, eol - arg);
+			ctx->huskv = cmdify(cmd);
 		}
 #undef CMP
 	}
@@ -1277,23 +1305,6 @@ prepend_path(const char *p)
 out:
 	setenv("PATH", pp, 1);
 	return;
-}
-
-static char**
-cmdify(char *restrict cmd)
-{
-	/* prep for about 16 params */
-	char **v = calloc(16U, sizeof(*v));
-	size_t i = 0U;
-	const char *ifs = getenv("IFS") ?: " \t\n";
-
-	v[0U] = strtok(cmd, ifs);
-	do {
-		if (UNLIKELY((i % 16U) == 15U)) {
-			v = realloc(v, (i + 1U + 16U) * sizeof(*v));
-		}
-	} while ((v[++i] = strtok(NULL, ifs)) != NULL);
-	return v;
 }
 
 
