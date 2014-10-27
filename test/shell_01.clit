@@ -1,0 +1,7 @@
+#!/usr/bin/clitoris  ## -*- shell-script -*-
+
+setopt shell /bin/cat
+
+$ echo "yes"
+echo "yes"
+$
