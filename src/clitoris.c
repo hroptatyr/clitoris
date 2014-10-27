@@ -722,8 +722,11 @@ init_chld(struct clit_chld_s ctx[static 1] __attribute__((unused)))
 }
 
 static int
-fini_chld(struct clit_chld_s ctx[static 1] __attribute__((unused)))
+fini_chld(struct clit_chld_s ctx[static 1])
 {
+	if (ctx->huskv != NULL) {
+		free(ctx->huskv);
+	}
 	return 0;
 }
 
