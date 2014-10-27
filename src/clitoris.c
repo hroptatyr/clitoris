@@ -1401,9 +1401,6 @@ main(int argc, char *argv[])
 	if (argi->srcdir_arg) {
 		setenv("srcdir", argi->srcdir_arg, 1);
 	}
-	if (argi->hash_arg) {
-		setenv("hash", argi->hash_arg, 1);
-	}
 	if (argi->husk_arg) {
 		proto.huskv = cmdify(argi->husk_arg);
 	}
