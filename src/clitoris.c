@@ -120,6 +120,9 @@ struct clit_chld_s {
 	unsigned int keep_going_p:1;
 
 	unsigned int timeo;
+
+	/* prepend this in front of /bin/sh */
+	char **huskv;
 };
 
 /* a test is the command (inlcuding stdin), stdout result, and stderr result */
@@ -1046,7 +1049,11 @@ init_tst(struct clit_chld_s ctx[static 1], struct clit_tst_s tst[static 1])
 			close(ctx->pou);
 		}
 
-		execl("/bin/sh", "sh", NULL);
+		if (!ctx->huskv) {
+			execl("/bin/sh", "sh", NULL);
+		} else {
+			execvp(*ctx->huskv, ctx->huskv);
+		}
 		error("exec'ing /bin/sh failed");
 		_exit(EXIT_FAILURE);
 
@@ -1269,11 +1276,25 @@ out:
 	return;
 }
 
+static char**
+cmdify(char *restrict cmd)
+{
+	/* prep for about 16 params */
+	char **v = calloc(16U, sizeof(*v));
+	size_t i = 0U;
+	const char *ifs = getenv("IFS") ?: " \t\n";
+
+	v[0U] = strtok(cmd, ifs);
+	do {
+		if (UNLIKELY((i % 16U) == 15U)) {
+			v = realloc(v, (i + 1U + 16U) * sizeof(*v));
+		}
+	} while ((v[++i] = strtok(NULL, ifs)) != NULL);
+	return v;
+}
+
 
-static int verbosep;
-static int ptyp;
-static int keep_going_p;
-static unsigned int timeo;
+static struct clit_chld_s proto;
 
 static int
 test_f(clitf_t tf)
@@ -1288,17 +1309,8 @@ test_f(clitf_t tf)
 		return -1;
 	}
 
-	/* preset options */
-	if (verbosep) {
-		ctx->verbosep = 1U;
-	}
-	if (ptyp) {
-		ctx->ptyp = 1U;
-	}
-	if (keep_going_p) {
-		ctx->keep_going_p = 1U;
-	}
-	ctx->timeo = timeo;
+	/* preset options from proto child */
+	*ctx = proto;
 
 	/* find options in the test script */
 	find_opt(ctx, bp, bz);
@@ -1379,23 +1391,20 @@ main(int argc, char *argv[])
 	if (argi->srcdir_arg) {
 		setenv("srcdir", argi->srcdir_arg, 1);
 	}
-	if (argi->hash_arg) {
-		setenv("hash", argi->hash_arg, 1);
-	}
-	if (argi->husk_arg) {
-		setenv("husk", argi->husk_arg, 1);
+	if (argi->shell_arg) {
+		proto.huskv = cmdify(argi->shell_arg);
 	}
 	if (argi->verbose_flag) {
-		verbosep = 1U;
+		proto.verbosep = 1U;
 	}
 	if (argi->pseudo_tty_flag) {
-		ptyp = 1U;
+		proto.ptyp = 1U;
 	}
 	if (argi->timeout_arg) {
-		timeo = strtoul(argi->timeout_arg, NULL, 10);
+		proto.timeo = strtoul(argi->timeout_arg, NULL, 10);
 	}
 	if (argi->keep_going_flag) {
-		keep_going_p = 1U;
+		proto.keep_going_p = 1U;
 	}
 	if (argi->diff_arg) {
 		cmd_diff = argi->diff_arg;
