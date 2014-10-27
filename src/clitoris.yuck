@@ -4,7 +4,7 @@ Run .clit regression test files.
 
   --builddir=DIR  Specify where the compiled binaries can be found.
   --srcdir=DIR  Specify where the source tree resides.
-  --husk=PROG  Use husk around tool, e.g. 'valgrind -v'
+  --shell=CMD   Use CMD as shell command, default: /bin/sh
 
   -v, --verbose  Repeat execution steps on stderr.
   -t, --pseudo-tty  Allocate a pseudo-tty for the tests to run in.

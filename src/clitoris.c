@@ -1052,16 +1052,6 @@ init_tst(struct clit_chld_s ctx[static 1], struct clit_tst_s tst[static 1])
 		if (!ctx->huskv) {
 			execl("/bin/sh", "sh", NULL);
 		} else {
-			size_t n = 0U;
-			for (const char *const *hp = ctx->huskv; *hp; hp++, n++);
-			if (UNLIKELY((n + 2U) / 16U != n / 16U)) {
-				/* realloc huskv */
-				size_t nu = (n / 16U + 1U) * 16U;
-				ctx->huskv = realloc(
-					ctx->huskv, nu * sizeof(*ctx->huskv));
-			}
-			ctx->huskv[n++] = "/bin/sh";
-			ctx->huskv[n] = NULL;
 			execvp(*ctx->huskv, ctx->huskv);
 		}
 		error("exec'ing /bin/sh failed");
@@ -1401,8 +1391,8 @@ main(int argc, char *argv[])
 	if (argi->srcdir_arg) {
 		setenv("srcdir", argi->srcdir_arg, 1);
 	}
-	if (argi->husk_arg) {
-		proto.huskv = cmdify(argi->husk_arg);
+	if (argi->shell_arg) {
+		proto.huskv = cmdify(argi->shell_arg);
 	}
 	if (argi->verbose_flag) {
 		proto.verbosep = 1U;
