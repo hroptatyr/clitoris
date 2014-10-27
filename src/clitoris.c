@@ -110,6 +110,7 @@ struct clit_opt_s {
 	unsigned int verbosep:1;
 	unsigned int ptyp:1;
 	unsigned int keep_going_p:1;
+	unsigned int shcmdp:1;
 
 	/* use this instead of /bin/sh */
 	char *shcmd;
@@ -733,6 +734,7 @@ find_opt(struct clit_opt_s options, const char *bp, size_t bz)
 				continue;
 			}
 			options.shcmd = strndup(arg, eol - arg);
+			options.shcmdp = 1U;
 		}
 #undef CMP
 	}
@@ -765,6 +767,9 @@ fini_chld(struct clit_chld_s ctx[static 1])
 {
 	if (ctx->huskv != NULL) {
 		free(ctx->huskv);
+	}
+	if (ctx->options.shcmdp) {
+		free(ctx->options.shcmd);
 	}
 	return 0;
 }
