@@ -92,4 +92,7 @@ XFAIL_TESTS += negexp_06.clit
 TESTS += supp_diff_01.clit
 TESTS += supp_diff_02.clit
 
+TESTS += shell_01.clit
+TESTS += shell_02.clit
+
 ## Makefile.am ends here
