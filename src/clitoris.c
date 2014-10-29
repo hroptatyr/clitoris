@@ -268,6 +268,15 @@ xmemmem(const char *hay, const size_t hayz, const char *ndl, const size_t ndlz)
 	return NULL;
 }
 
+static char*
+xstrndup(const char *s, size_t z)
+{
+	char *res = malloc(z + 1U);
+	memcpy(res, s, z);
+	res[z] = '\0';
+	return res;
+}
+
 static char**
 cmdify(char *restrict cmd)
 {
@@ -733,7 +742,7 @@ find_opt(struct clit_opt_s options, const char *bp, size_t bz)
 				/* ignore and get on with it */
 				continue;
 			}
-			options.shcmd = strndup(arg, eol - arg);
+			options.shcmd = xstrndup(arg, eol - arg);
 			options.shcmdp = 1U;
 		}
 #undef CMP
