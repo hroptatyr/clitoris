@@ -81,6 +81,17 @@
 # define PATH_MAX	256U
 #endif	/* !PATH_MAX */
 
+#if defined HAVE_SPLICE
+# ifdef __INTEL_COMPILER
+#  pragma warning(disable:1419)
+# endif	/* __INTEL_COMPILER */
+extern ssize_t splice(int fd_in, loff_t *off_in, int fd_out, loff_t *off_out,
+		      size_t len, unsigned int flags);
+# ifdef __INTEL_COMPILER
+#  pragma warning(default:1419)
+# endif	/* __INTEL_COMPILER */
+#endif	/* HAVE_SPLICE */
+
 typedef struct clitf_s clitf_t;
 typedef struct clit_buf_s clit_buf_t;
 typedef struct clit_bit_s clit_bit_t;
