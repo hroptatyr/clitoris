@@ -41,11 +41,8 @@ AC_CONFIG_LINKS([GNUmakefile:GNUmakefile])
 ## check for yuck helper
 AX_CHECK_YUCK
 
-## check for pseudo-tty support
-AC_CHECK_HEADERS([pty.h])
-AM_CONDITIONAL([HAVE_PTY_H], [test "${ac_cv_header_pty_h}" = "yes"])
-
-AC_CHECK_FUNCS([splice])
+## check for our requisites
+AX_CHECK_CLITORIS
 
 
 AC_CONFIG_FILES([Makefile])
@@ -61,6 +58,8 @@ echo "Build summary"
 echo "============="
 echo
 echo "[[x]] clitoris"
+echo "[[x]] hxdiff"
+echo "[[x]] shack"
 echo
 
 dnl configure.ac ends here
