@@ -58,6 +58,8 @@ echo "Build summary"
 echo "============="
 echo
 echo "[[x]] clitoris"
+echo "[[x]] hxdiff"
+echo "[[x]] shack"
 echo
 
 dnl configure.ac ends here
