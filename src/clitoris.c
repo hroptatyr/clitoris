@@ -310,15 +310,18 @@ cmdify(char *restrict cmd)
 {
 	/* prep for about 16 params */
 	char **v = calloc(16U, sizeof(*v));
-	size_t i = 0U;
-	const char *ifs = getenv("IFS") ?: " \t\n";
 
-	v[0U] = strtok(cmd, ifs);
-	do {
-		if (UNLIKELY((i % 16U) == 15U)) {
-			v = realloc(v, (i + 1U + 16U) * sizeof(*v));
-		}
-	} while ((v[++i] = strtok(NULL, ifs)) != NULL);
+	if (LIKELY(v != NULL)) {
+		const char *ifs = getenv("IFS") ?: " \t\n";
+		size_t i = 0U;
+
+		v[0U] = strtok(cmd, ifs);
+		do {
+			if (UNLIKELY((i % 16U) == 15U)) {
+				v = realloc(v, (i + 1U + 16U) * sizeof(*v));
+			}
+		} while ((v[++i] = strtok(NULL, ifs)) != NULL);
+	}
 	return v;
 }
 
