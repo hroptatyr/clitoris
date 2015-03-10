@@ -108,8 +108,10 @@ static size_t pgsz;
 #elif !defined WORDS_BIGENDIAN && defined be32toh
 # define htooe32(x)	((uint32_t)be32toh((uint32_t)x))
 #else
-# warning htooe32() will not convert anything
-# define htooe32(x)	((uint32_t)x)
+# define htooe32(x)	((((uint32_t)x >> 24U & 0xffU) << 0U) |	 \
+			 (((uint32_t)x >> 16U & 0xffU) << 8U) |	 \
+			 (((uint32_t)x >> 8U & 0xffU) << 16U) |	 \
+			 (((uint32_t)x >> 0U & 0xffU) << 24U))
 #endif
 
 /* and even now we may be out of luck */
