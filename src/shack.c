@@ -89,7 +89,7 @@ typedef struct {
 	uint32_t v[5U];
 } sha_t;
 
-static const sha_t null_sha = {};
+static const sha_t null_sha;
 static size_t pgsz;
 
 
