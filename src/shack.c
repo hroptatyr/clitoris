@@ -343,11 +343,13 @@ shaf(sha_t *tgt, const char *fn)
 	size_t fz;
 	int rc = -1;
 	sha_t h = {
-		0x67452301U,
-		0xEFCDAB89U,
-		0x98BADCFEU,
-		0x10325476U,
-		0xC3D2E1F0U,
+		.v = {
+			0x67452301U,
+			0xEFCDAB89U,
+			0x98BADCFEU,
+			0x10325476U,
+			0xC3D2E1F0U,
+		}
 	};
 
 	if ((fd = open(fn, O_RDONLY)) < 0) {
