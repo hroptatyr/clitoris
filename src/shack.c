@@ -165,8 +165,14 @@ static size_t pgsz;
 #elif !defined WORDS_BIGENDIAN && defined be64toh
 # define htooe64(x)	((uint64_t)be64toh((uint64_t)x))
 #else
-# warning htooe64() will not convert anything
-# define htooe64(x)	((uint64_t)x)
+# define htooe64(x)	(((uint64_t)((uint64_t)x >> 56U & 0xffU) << 0U) | \
+			 ((uint64_t)((uint64_t)x >> 48U & 0xffU) << 8U) | \
+			 ((uint64_t)((uint64_t)x >> 40U & 0xffU) << 16U) | \
+			 ((uint64_t)((uint64_t)x >> 32U & 0xffU) << 24U) | \
+			 ((uint64_t)((uint64_t)x >> 24U & 0xffU) << 32U) | \
+			 ((uint64_t)((uint64_t)x >> 16U & 0xffU) << 40U) | \
+			 ((uint64_t)((uint64_t)x >> 8U & 0xffU) << 48U) | \
+			 ((uint64_t)((uint64_t)x >> 0U & 0xffU) << 56U))
 #endif
 
 #if !defined be64toh
