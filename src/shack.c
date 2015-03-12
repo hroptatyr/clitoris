@@ -89,7 +89,7 @@ typedef struct {
 	uint32_t v[5U];
 } sha_t;
 
-static const sha_t null_sha = {};
+static const sha_t null_sha;
 static size_t pgsz;
 
 
@@ -165,8 +165,14 @@ static size_t pgsz;
 #elif !defined WORDS_BIGENDIAN && defined be64toh
 # define htooe64(x)	((uint64_t)be64toh((uint64_t)x))
 #else
-# warning htooe64() will not convert anything
-# define htooe64(x)	((uint64_t)x)
+# define htooe64(x)	(((uint64_t)((uint64_t)x >> 56U & 0xffU) << 0U) | \
+			 ((uint64_t)((uint64_t)x >> 48U & 0xffU) << 8U) | \
+			 ((uint64_t)((uint64_t)x >> 40U & 0xffU) << 16U) | \
+			 ((uint64_t)((uint64_t)x >> 32U & 0xffU) << 24U) | \
+			 ((uint64_t)((uint64_t)x >> 24U & 0xffU) << 32U) | \
+			 ((uint64_t)((uint64_t)x >> 16U & 0xffU) << 40U) | \
+			 ((uint64_t)((uint64_t)x >> 8U & 0xffU) << 48U) | \
+			 ((uint64_t)((uint64_t)x >> 0U & 0xffU) << 56U))
 #endif
 
 #if !defined be64toh
@@ -337,11 +343,13 @@ shaf(sha_t *tgt, const char *fn)
 	size_t fz;
 	int rc = -1;
 	sha_t h = {
-		0x67452301U,
-		0xEFCDAB89U,
-		0x98BADCFEU,
-		0x10325476U,
-		0xC3D2E1F0U,
+		.v = {
+			0x67452301U,
+			0xEFCDAB89U,
+			0x98BADCFEU,
+			0x10325476U,
+			0xC3D2E1F0U,
+		}
 	};
 
 	if ((fd = open(fn, O_RDONLY)) < 0) {
