@@ -73,6 +73,10 @@
 # define countof(x)	(sizeof(x) / sizeof(*x))
 #endif	/* !countof */
 
+#if !defined strlenof
+# define strlenof(x)	(sizeof(x) - 1U)
+#endif	/* !strlenof */
+
 #if !defined with
 # define with(args...)	for (args, *__ep__ = (void*)1; __ep__; __ep__ = 0)
 #endif	/* !with */
@@ -355,7 +359,7 @@ get_argv0dir(const char *argv0)
 #elif defined __APPLE__
 	} else if (1) {
 		char buf[PATH_MAX];
-		uint32_t bsz = sizeof(buf) - 1U;
+		uint32_t bsz = strlenof(buf);
 
 		if (_NSGetExecutablePath(buf, &bsz) < 0) {
 			/* plan B again */
@@ -632,12 +636,12 @@ find_ignore(struct clit_tst_s tst[static 1])
 		static char tok_out[] = "output";
 		static char tok_ret[] = "return";
 
-		if (strncmp(cmd, tok_ign, sizeof(tok_ign) - 1U)) {
+		if (strncmp(cmd, tok_ign, strlenof(tok_ign))) {
 			/* don't bother */
 			break;
 		}
 		/* fast-forward a little */
-		cmd += sizeof(tok_ign) - 1U;
+		cmd += strlenof(tok_ign);
 
 		if (isspace(*cmd)) {
 			/* it's our famous ignore token it seems */
@@ -645,14 +649,14 @@ find_ignore(struct clit_tst_s tst[static 1])
 		} else if (*cmd++ != '-') {
 			/* unknown token then */
 			break;
-		} else if (!strncmp(cmd, tok_out, sizeof(tok_out) - 1U)) {
+		} else if (!strncmp(cmd, tok_out, strlenof(tok_out))) {
 			/* ignore-output it is */
 			tst->ign_out = 1U;
-			cmd += sizeof(tok_out) - 1U;
-		} else if (!strncmp(cmd, tok_ret, sizeof(tok_ret) - 1U)) {
+			cmd += strlenof(tok_out);
+		} else if (!strncmp(cmd, tok_ret, strlenof(tok_ret))) {
 			/* ignore-return it is */
 			tst->ign_ret = 1U;
-			cmd += sizeof(tok_ret) - 1U;
+			cmd += strlenof(tok_ret);
 		} else {
 			/* don't know what's going on */
 			break;
@@ -800,7 +804,7 @@ find_opt(struct clit_opt_s options, const char *bp, size_t bz)
 	static const char magic[] = "setopt ";
 
 	for (const char *mp;
-	     (mp = xmemmem(bp, bz, magic, sizeof(magic) - 1U)) != NULL;
+	     (mp = xmemmem(bp, bz, magic, strlenof(magic))) != NULL;
 	     bz -= (mp + 1U) - bp, bp = mp + 1U) {
 		unsigned int opt;
 
@@ -814,12 +818,12 @@ find_opt(struct clit_opt_s options, const char *bp, size_t bz)
 			opt = 0U;
 		} else {
 			/* found rubbish then */
-			mp += sizeof(magic) - 1U;
+			mp += strlenof(magic);
 			continue;
 		}
-#define CMP(x, lit)	(strncmp((x), (lit), sizeof(lit) - 1))
+#define CMP(x, lit)	(strncmp((x), (lit), strlenof(lit)))
 		/* parse the option value */
-		mp += sizeof(magic) - 1U;
+		mp += strlenof(magic);
 		if (NULL) {
 			/* not reached */
 			;
@@ -1629,8 +1633,8 @@ main(int argc, char *argv[])
 			/* use at most 256U bytes for blddir */
 			char _blddir[256U];
 
-			memccpy(_blddir, blddir, '\0', sizeof(_blddir) - 1U);
-			_blddir[sizeof(_blddir) - 1U] = '\0';
+			memccpy(_blddir, blddir, '\0', strlenof(_blddir));
+			_blddir[strlenof(_blddir)] = '\0';
 			prepend_path(_blddir);
 		}
 	}
