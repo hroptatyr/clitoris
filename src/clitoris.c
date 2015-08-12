@@ -1140,9 +1140,6 @@ differ(struct clit_chld_s ctx[static 1], clit_bit_t exp, bool xpnd_proto_p)
 		if (expfd >= 0) {
 			close(expfd);
 		}
-		if (actfd >= 0) {
-			close(actfd);
-		}
 		kill(difftool, SIGTERM);
 		difftool = -1;
 		break;
