@@ -1,0 +1,7 @@
+#!/usr/bin/clitoris
+
+setopt exit-code
+
+## should be a skip
+$ exit 77
+$

@@ -95,4 +95,7 @@ TESTS += supp_diff_02.clit
 TESTS += shell_01.clit
 TESTS += shell_02.clit
 
+TESTS += exit_code_01.clit
+XFAIL_TESTS += exit_code_02.clit
+
 ## Makefile.am ends here
