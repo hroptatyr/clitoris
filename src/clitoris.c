@@ -126,6 +126,9 @@ struct clit_opt_s {
 	unsigned int ptyp:1;
 	unsigned int keep_going_p:1;
 	unsigned int shcmdp:1;
+	/* just some padding to start afresh on an 8-bit boundary */
+	unsigned int:4;
+	unsigned int xcod:8;
 
 	/* use this instead of /bin/sh */
 	char *shcmd;
@@ -851,6 +854,14 @@ find_opt(struct clit_opt_s options, const char *bp, size_t bz)
 			}
 			options.shcmd = xstrndup(arg, eol - arg);
 			options.shcmdp = 1U;
+		} else if (CMP(mp, "exit-code") == 0) {
+			const char *arg = mp + sizeof("exit-code");
+			char *p;
+			long unsigned int xc;
+
+			if ((xc = strtoul(arg, &p, 0), *p == '\n')) {
+				options.xcod = (unsigned int)xc;
+			}
 		}
 #undef CMP
 	}
@@ -1328,8 +1339,8 @@ run_tst(struct clit_chld_s ctx[static 1], struct clit_tst_s tst[static 1])
 			rc = 0;
 		} else if (tst->exp_ret == 255U && rc) {
 			rc = 0;
-		} else {
-			rc = 1;
+		} else if (ctx->options.xcod) {
+			rc = ctx->options.xcod;
 		}
 	} else {
 		rc = 1;
@@ -1605,6 +1616,13 @@ main(int argc, char *argv[])
 		cmd_diff = argi->diff_arg;
 	} else if (getenv("DIFF") != NULL) {
 		cmd_diff = getenv("DIFF");
+	}
+	if (argi->exit_code_arg == (const char*)0x1U) {
+		options.xcod = 0U;
+	} else if (argi->exit_code_arg) {
+		options.xcod = strtoul(argi->exit_code_arg, NULL, 0);
+	} else {
+		options.xcod = 1U;
 	}
 
 	/* Although I cannot support my claim with a hard survey, I would
