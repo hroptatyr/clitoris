@@ -150,7 +150,7 @@ struct clit_chld_s {
 	char **huskv;
 };
 
-/* a test is the command (inlcuding stdin), stdout result, and stderr result */
+/* a test is the command (including stdin), stdout result, and stderr result */
 struct clit_tst_s {
 	clit_bit_t cmd;
 	clit_bit_t out;
