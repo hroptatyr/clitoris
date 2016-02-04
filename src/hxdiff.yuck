@@ -1,3 +1,5 @@
 Usage: hxdiff [OPTION]... FILE1 FILE2
 
 Diff the hexdump of FILE1 and FILE2.
+
+  -u                    Ignored for compatibility with diff.
