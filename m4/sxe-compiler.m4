@@ -230,7 +230,7 @@ AC_DEFUN([SXE_WARNFLAGS], [dnl
 	## glibc is intentionally not `-Wpointer-arith'-clean.
 	## Ulrich Drepper has rejected patches to fix
 	## the glibc header files.
-	## we dont care
+	## we don't care
 	SXE_CHECK_COMPILER_FLAG([-Wpointer-arith], [
 		warnflags="$warnflags -Wpointer-arith"])
 
