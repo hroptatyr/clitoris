@@ -353,6 +353,7 @@ get_argv0dir(const char *argv0)
 
 	if (0) {
 #if 0
+
 #elif defined __linux__
 /* don't rely on argv0 at all */
 	} else if (1) {
@@ -360,17 +361,67 @@ get_argv0dir(const char *argv0)
 			/* we've got a plan B */
 			goto planb;
 		}
-#elif defined __APPLE__
+#elif defined __APPLE__ && defined __MACH__
 	} else if (1) {
 		char buf[PATH_MAX];
 		uint32_t bsz = strlenof(buf);
 
+		buf[bsz] = '\0';
 		if (_NSGetExecutablePath(buf, &bsz) < 0) {
 			/* plan B again */
 			goto planb;
 		}
 		/* strdup BUF quickly */
 		res = strdup(buf);
+#elif defined __NetBSD__
+	} else if (1) {
+		static const char myself[] = "/proc/curproc/exe";
+		char buf[PATH_MAX];
+		ssize_t z;
+
+		if (UNLIKELY((z = readlink(myself, buf, bsz)) < 0)) {
+			/* plan B */
+			goto planb;
+		}
+		/* strndup him */
+		res = strndup(buf, z);
+#elif defined __DragonFly__
+	} else if (1) {
+		static const char myself[] = "/proc/curproc/file";
+		char buf[PATH_MAX];
+		ssize_t z;
+
+		if (UNLIKELY((z = readlink(myself, buf, bsz)) < 0)) {
+			/* blimey, proceed with plan B */
+			goto planb;
+		}
+		/* strndup him */
+		res = strndup(buf, z);
+#elif defined __FreeBSD__
+	} else if (1) {
+		int mib[] = {CTL_KERN, KERN_PROC, KERN_PROC_PATHNAME, -1};
+		char buf[PATH_MAX];
+		size_t z = strlenof(buf);
+
+		/* make sure that \0 terminator fits */
+		buf[bsz] = '\0';
+		if (UNLIKELY(sysctl(mib, countof(mib), buf, &z, NULL, 0) < 0)) {
+			/* no luck today */
+			goto planb;
+		}
+		/* make the result our own */
+		res = strdup(buf);
+#elif defined __sun || defined sun
+	} else if (1) {
+		char buf[PATH_MAX];
+		ssize_t z;
+
+		snprintf(buf, sizeof(buf), "/proc/%d/path/a.out", getpid());
+		if (UNLIKELY((z = readlink(buf, buf, sizeof(buf))) < 0)) {
+			/* nope, plan A failed */
+			goto planb;
+		}
+		res = strndup(buf, z);
 #endif	/* OS */
 	} else {
 	planb:
