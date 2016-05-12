@@ -406,7 +406,7 @@ get_argv0dir(const char *argv0)
 		size_t z = strlenof(buf);
 
 		/* make sure that \0 terminator fits */
-		buf[bsz] = '\0';
+		buf[z] = '\0';
 		if (UNLIKELY(sysctl(mib, countof(mib), buf, &z, NULL, 0) < 0)) {
 			/* no luck today */
 			goto planb;
