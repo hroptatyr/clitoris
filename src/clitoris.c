@@ -318,9 +318,11 @@ xmemmem(const char *hay, const size_t hayz, const char *ndl, const size_t ndlz)
 static char*
 xstrndup(const char *s, size_t z)
 {
-	char *res = malloc(z + 1U);
-	memcpy(res, s, z);
-	res[z] = '\0';
+	char *res;
+	if ((res = malloc(z + 1U))) {
+		memcpy(res, s, z);
+		res[z] = '\0';
+	}
 	return res;
 }
 
@@ -424,13 +426,16 @@ get_argv0dir(const char *argv0)
 		res = strndup(buf, z);
 #endif	/* OS */
 	} else {
+		size_t argz0;
+
 	planb:
 		/* backup plan, massage argv0 */
 		if (argv0 == NULL) {
 			return NULL;
 		}
-		/* otherwise simply copy ARGV0 */
-		res = strdup(argv0);
+		/* otherwise copy ARGV0, or rather the first PATH_MAX chars */
+		for (argz0 = 0U; argz0 < PATH_MAX && argv0[argz0]; argz0++);
+		res = strndup(argv0, argz0);
 	}
 
 	/* path extraction aka dirname'ing, absolute or otherwise */
