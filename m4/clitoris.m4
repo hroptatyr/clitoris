@@ -1,6 +1,6 @@
 dnl clitoris.m4 --- checks necessary for the clitoris test harness
 dnl
-dnl Copyright (C) 2013-2015 Sebastian Freundt
+dnl Copyright (C) 2013-2016 Sebastian Freundt
 dnl
 dnl Author: Sebastian Freundt <hroptatyr@fresse.org>
 dnl
