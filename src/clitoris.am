@@ -14,7 +14,9 @@ clitoris_LDADD += -lutil
 endif  HAVE_PTY_H
 BUILT_SOURCES += clitoris.yucc
 
-## yuck rule
-clitoris.yucc: clitoris.yuck
+## yuck rule, use implicit rule so we can use $< ($(.IMPSRC))
+SUFFIXES += .yuck
+SUFFIXES += .yucc
+.yuck.yucc:
 	$(AM_V_GEN) PATH=$(top_builddir)/build-aux:"$${PATH}" \
 		yuck$(EXEEXT) gen -o $@ $<
