@@ -318,6 +318,7 @@ xmemmem(const char *hay, const size_t hayz, const char *ndl, const size_t ndlz)
 	return NULL;
 }
 
+/* coverity[-tainted_data_sink: arg-0] */
 static char*
 xstrndup(const char *s, size_t z)
 {
