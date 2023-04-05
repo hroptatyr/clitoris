@@ -48,6 +48,7 @@
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <string.h>
+#include <signal.h>
 #include <errno.h>
 #include <poll.h>
 
