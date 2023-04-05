@@ -48,6 +48,7 @@
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <string.h>
+#include <signal.h>
 #include <errno.h>
 #include <poll.h>
 
@@ -200,11 +201,11 @@ init_diff(struct clit_chld_s ctx[static 1])
 	}
 
 	block_sigs();
-	switch ((diff = vfork())) {
+	switch ((diff = fork())) {
 	case -1:
 		/* i am an error */
 		unblock_sigs();
-		error("vfork failed");
+		error("fork failed");
 		break;
 
 	case 0:;
