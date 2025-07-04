@@ -44,9 +44,9 @@
 #if !defined _NETBSD_SOURCE
 # define _NETBSD_SOURCE
 #endif	/* !_NETBSD_SOURCE */
-#if !defined _DARWIN_SOURCE
-# define _DARWIN_SOURCE
-#endif	/* !_DARWIN_SOURCE */
+#if !defined _DARWIN_C_SOURCE
+# define _DARWIN_C_SOURCE
+#endif	/* !_DARWIN_C_SOURCE */
 #if !defined _ALL_SOURCE
 # define _ALL_SOURCE
 #endif	/* !_ALL_SOURCE */
@@ -75,6 +75,9 @@
 #if defined WITH_SCMVER
 # include <yuck-scmver.h>
 #endif	/* WITH_SCMVER */
+#ifdef __APPLE__
+# include <mach-o/dyld.h>
+#endif
 
 #if !defined LIKELY
 # define LIKELY(_x)	__builtin_expect((_x), 1)
